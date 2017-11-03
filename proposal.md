@@ -1,20 +1,20 @@
-Name: ____________           ID:   ____________
+Name: Justin Ledford           ID:   28148527
 
 ## Proposed Project
 
-> Replace this paragraph with the description of what your project
-> will do. Tell me what kind of interface it will have, and roughly
-> how it will work. I don't need more than three or four sentences,
-> unless you feel compelled to write more.
+My project will be a hash cracker, using multiple types of attacks
+including dictionary, brute-force and masked attacks. It will have
+a command line interface that given the hash, hash type, and
+attack mode, attempt to crack the hash in parallel using
+multiple processes, as well as across distributed nodes.
 
 ## Outline Structure
 
-> Describe how you'll organize your code. What is the process and
-> supervision structure? If it uses a framework, how does it fit in. I
-> just need to understand the direction you plan to take. Again, three
-> or four sentences are probably enough.
+The application will be composed of a front-end command line interface,
+and a server to receive requests from the interface. This server will
+then handle the task of splitting the attack into multiple processes
+and nodes. There will also be a data store to save and load computed
+hashes if requested.
 
-
-
-> replace all the ">" lines with your content, then push this to
-> github and issue a merge request.
+If time allows I will attempt to have the computation performed
+using CUDA on GPU nodes, with Elixir handling the interface and server.
