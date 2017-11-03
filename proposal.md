@@ -10,11 +10,12 @@ multiple processes, as well as across distributed nodes.
 
 ## Outline Structure
 
-The application will be composed of a front-end command line interface,
+The project will be composed of a front-end command line interface,
 and a server to receive requests from the interface. This server will
-then handle the task of splitting the attack into multiple processes
-and nodes. There will also be a data store to save and load computed
-hashes if requested.
+then handle the task of splitting the attack into multiple processes and
+supervising these processes, as well as distributing work to remote nodes.
+There will also be a supervised data store to save and load computed
+hashes if requested by the client.
 
 If time allows I will attempt to have the computation performed
 using CUDA on GPU nodes, with Elixir handling the interface and server.
