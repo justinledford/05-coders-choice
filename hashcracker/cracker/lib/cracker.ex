@@ -1,7 +1,11 @@
 defmodule Cracker do
   def crack(hash, hash_type, :brute) do
-    string_list(?\ ..?~)
-    |> generate(50)
+    ascii_strings(50)
+    |> find_matching_hash(hash, hash_type)
+  end
+
+  def find_matching_hash(enum, hash, hash_type) do
+    enum
     |> Stream.map(fn x -> { x, :crypto.hash(hash_type, x) } end)
     |> Enum.find(fn { _, hash_ } -> hash_ == hash end)
   end
@@ -11,6 +15,12 @@ defmodule Cracker do
   # Utilities for generating strings
   #
   ####
+
+  def ascii_strings(max_length) do
+    ?\ ..?~
+    |> string_list
+    |> generate(max_length)
+  end
 
   def string_list(range) do
     for n <- range, do: << n :: utf8 >>
