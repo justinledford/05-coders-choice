@@ -10,4 +10,15 @@ defmodule CrackerTest do
     assert pass == pass_guess
     assert hash == hash_guess
   end
+
+  test "test wordlist cracking" do
+    hash_type = :md5
+    pass = "password"
+    hash = :crypto.hash(hash_type, pass)
+    {pass_guess, hash_guess} = Cracker.crack(hash, hash_type,
+                                             :dictionary, "wordlist.txt")
+    assert pass == pass_guess
+    assert hash == hash_guess
+  end
+
 end

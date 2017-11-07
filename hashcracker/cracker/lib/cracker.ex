@@ -4,6 +4,12 @@ defmodule Cracker do
     |> find_matching_hash(hash, hash_type)
   end
 
+  def crack(hash, hash_type, :dictionary, wordlist_path) do
+    File.stream!(wordlist_path)
+    |> Stream.map(&String.trim_trailing/1)
+    |> find_matching_hash(hash, hash_type)
+  end
+
   def find_matching_hash(enum, hash, hash_type) do
     enum
     |> Stream.map(fn x -> { x, :crypto.hash(hash_type, x) } end)
