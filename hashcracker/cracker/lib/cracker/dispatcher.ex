@@ -36,15 +36,13 @@ defmodule Cracker.Dispatcher do
 
     # Give each worker some work
     Enum.map(workers, fn pid ->
-      Cracker.Generator.next(@num_strings)
-      |> Cracker.Worker.start_work(hash, hash_type, pid)
+      Cracker.Worker.start_work(hash, hash_type, pid)
     end)
     {:noreply, {workers, hash, hash_type}}
   end
 
   def handle_cast({:dispatch_more_work, pid}, {workers, hash, hash_type}) do
-    Cracker.Generator.next(@num_strings)
-    |> Cracker.Worker.start_work(hash, hash_type, pid)
+    Cracker.Worker.start_work(hash, hash_type, pid)
     {:noreply, {workers, hash, hash_type}}
   end
 

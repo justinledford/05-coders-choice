@@ -1,6 +1,8 @@
 defmodule Cracker.Generator do
   use GenServer
 
+  @num_strings 65536
+
   #####
   # Externel API
 
@@ -12,42 +14,43 @@ defmodule Cracker.Generator do
     GenServer.cast(__MODULE__, {:ascii, n})
   end
 
-  def init_dictionary(wordlist_path) do
-    GenServer.cast(__MODULE__, {:dictionary, wordlist_path})
-  end
-
-  def next(n) do
-    GenServer.call(__MODULE__, {:next, n})
-  end
-
-  def get_stream do
-    GenServer.call(__MODULE__, :get_stream)
-  end
+  #def init_dictionary(wordlist_path) do
+  #  GenServer.cast(__MODULE__, {:dictionary, wordlist_path})
+  #end
 
   ####
   # GenServer implementation
   ####
 
   def handle_cast({:ascii, n}, _) do
-    {:noreply, ascii_strings(n)}
+    task = Task.async(&generate_task/0)
+    {:noreply, task}
   end
 
-  def handle_cast({:dictionary, wordlist_path}, _) do
-    {:noreply, word_list(wordlist_path)}
-  end
-
-  def handle_call({:next, n}, _from, stream) do
-    {taken, stream} = StreamSplit.take_and_drop(stream, n)
-    {:reply, taken, stream}
-  end
-
-  def handle_call(:get_stream, _from, stream) do
-    {:reply, stream, nil}
-  end
+  #def handle_cast({:dictionary, wordlist_path}, _) do
+  #  {:noreply, word_list(wordlist_path)}
+  #end
 
   ###
   # Generator functions
   ###
+
+  def generate_task do
+    ascii_strings(50)
+    |> StreamSplit.take_and_drop(@num_strings)
+    |> generate_task
+  end
+
+  def generate_task({:halted, {_, taken}}) do
+    Cracker.Queue.enqueue(taken)
+  end
+
+  def generate_task({taken, stream}) do
+    Cracker.Queue.enqueue(taken)
+    stream
+    |> StreamSplit.take_and_drop(@num_strings)
+    |> generate_task
+  end
 
   defp word_list(wordlist_path) do
     File.stream!(wordlist_path)

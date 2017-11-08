@@ -7,14 +7,15 @@ defmodule Cracker.Worker do
     GenServer.start_link(__MODULE__, [])
   end
 
-  def start_work(enum, hash, hash_type, pid) do
-    GenServer.cast(pid, {:work, enum, hash, hash_type})
+  def start_work(hash, hash_type, pid) do
+    GenServer.cast(pid, {:work, hash, hash_type})
   end
 
   #####
   # GenServer implementation
-  def handle_cast({:work, enum, hash, hash_type}, _) do
-    find_matching_hash(enum, hash, hash_type)
+  def handle_cast({:work, hash, hash_type}, _) do
+    Cracker.Queue.dequeue()
+    |> find_matching_hash(hash, hash_type)
     |> message_dispatcher
     {:noreply, nil}
   end
