@@ -15,8 +15,8 @@ defmodule Cracker.Dispatcher do
                    {:init_dispatch, :brute, num_workers, hash, hash_type})
   end
 
-  def request_more_work(pid) do
-    GenServer.cast __MODULE__, {:dispatch_more_work, pid}
+  def work_ready(work) do
+    GenServer.cast __MODULE__, {:work_ready, work}
   end
 
   def found_pass(pass) do
@@ -34,15 +34,12 @@ defmodule Cracker.Dispatcher do
       [pid | workers]
     end)
 
-    # Give each worker some work
-    Enum.map(workers, fn pid ->
-      Cracker.Worker.start_work(hash, hash_type, pid)
-    end)
     {:noreply, {workers, hash, hash_type}}
   end
 
-  def handle_cast({:dispatch_more_work, pid}, {workers, hash, hash_type}) do
-    Cracker.Worker.start_work(hash, hash_type, pid)
+  def handle_cast({:work_ready, enum}, {workers, hash, hash_type}) do
+    pid = Enum.random workers
+    Cracker.Worker.start_work(enum, hash, hash_type, pid)
     {:noreply, {workers, hash, hash_type}}
   end
 

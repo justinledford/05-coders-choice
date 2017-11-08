@@ -42,11 +42,11 @@ defmodule Cracker.Generator do
   end
 
   def generate_task({:halted, {_, taken}}) do
-    Cracker.Queue.enqueue(taken)
+    Cracker.Dispatcher.work_ready(taken)
   end
 
   def generate_task({taken, stream}) do
-    Cracker.Queue.enqueue(taken)
+    Cracker.Dispatcher.work_ready(taken)
     stream
     |> StreamSplit.take_and_drop(@num_strings)
     |> generate_task
