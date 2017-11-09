@@ -17,7 +17,12 @@ defmodule Cracker.Dispatcher do
 
   def start_mask(num_workers, hash, hash_type, mask) do
     GenServer.cast(__MODULE__,
-                   {:init_dispatch, :mask, num_workers, hash, hash_type, mask})
+                   {:mask, num_workers, hash, hash_type, mask})
+  end
+
+  def start_mask_increment(num_workers, hash, hash_type, mask, start, stop) do
+    GenServer.cast(__MODULE__,
+                   {:mask, num_workers, hash, hash_type, mask, start, stop})
   end
 
   def work_ready(work) do
@@ -46,15 +51,13 @@ defmodule Cracker.Dispatcher do
     {:noreply, {workers, hash, hash_type}}
   end
 
-  def handle_cast({:init_dispatch, :mask, num_workers, hash, hash_type, mask}, _) do
+  def handle_cast({:mask, num_workers, hash, hash_type, mask}, _) do
     # Start up workers
     workers = Enum.reduce(1..num_workers, [], fn _, workers ->
       {:ok, pid} = Cracker.Worker.start_link
       [pid | workers]
     end)
-
     [ h | t ] = Cracker.Util.mask_to_enums(mask)
-
     h
     |> Cracker.Util.chunk(num_workers)
     |> Enum.map(fn enum -> [enum | t] end)
@@ -62,11 +65,26 @@ defmodule Cracker.Dispatcher do
     |> Enum.map(fn {enums, worker} ->
          Cracker.Worker.mask_attack(enums, hash, hash_type, worker)
        end)
-
-
     {:noreply, {workers, hash, hash_type}}
   end
 
+  def handle_cast({:mask, num_workers, hash, hash_type, mask, start, stop}, _) do
+    # Start up workers
+    workers = Enum.reduce(1..num_workers, [], fn _, workers ->
+      {:ok, pid} = Cracker.Worker.start_link
+      [pid | workers]
+    end)
+    [ h | t ] = Cracker.Util.mask_to_enums(mask)
+    h
+    |> Cracker.Util.chunk(num_workers)
+    |> Enum.map(fn enum -> [enum | t] end)
+    |> Enum.zip(workers)
+    |> Enum.map(fn {enums, worker} ->
+       Cracker.Worker.mask_attack_increment(enums, start, stop,
+                                            hash, hash_type, worker)
+       end)
+    {:noreply, {workers, hash, hash_type}}
+  end
 
 
   def handle_cast({:work_ready, enum}, {workers, hash, hash_type}) do

@@ -32,11 +32,17 @@ defmodule Cracker.Util do
     chunk(enum, num_chunks-1, chunk_size, acc)
   end
 
-  def product(enums) do
-    Enum.reduce(enums, [[]], fn enum, acc ->
-      for x <- enum, y <- acc, do: [x | y]
+  def listify(x) when is_list(x) do
+    x
+  end
+  def listify(x) do
+    [x]
+  end
+
+  def product(enums, results \\ [[]]) do
+    Enum.reduce(enums, results, fn enum, acc ->
+      for x <- enum, y <- acc, do: listify(y) ++ listify(x)
     end)
-    |> Enum.map(&Enum.reverse/1)
   end
 
 end
