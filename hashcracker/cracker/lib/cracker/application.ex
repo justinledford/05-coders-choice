@@ -3,9 +3,6 @@ defmodule Cracker.Application do
 
   def start(_type, _args) do
     Supervisor.start_link([
-      %{id: Cracker.Generator,
-        start: {Cracker.Generator, :start_link, []},
-        restart: :transient},
       %{id: Cracker.Dispatcher,
         start: {Cracker.Dispatcher, :start_link, []},
         restart: :transient}
