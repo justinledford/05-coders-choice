@@ -2,7 +2,7 @@ defmodule Cracker.Dispatcher do
   use GenServer
 
   @num_strings 65536
-  @ascii_upperbound 50
+  @brute_force_upper_bound 3
 
   #####
   # External API
@@ -10,9 +10,12 @@ defmodule Cracker.Dispatcher do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
+  # Just mask increment with mask ?a up to 64 (arbitrary upper bound)
   def start_brute_force(num_workers, hash, hash_type) do
+    mask = String.duplicate("?a", @brute_force_upper_bound)
     GenServer.cast(__MODULE__,
-                   {:init_dispatch, :brute, num_workers, hash, hash_type})
+                   {:mask, num_workers, hash, hash_type,
+                     mask, 1, @brute_force_upper_bound})
   end
 
   def start_mask(num_workers, hash, hash_type, mask) do
@@ -39,18 +42,6 @@ defmodule Cracker.Dispatcher do
 
   #####
   # GenServer implementation
-  def handle_cast({:init_dispatch, :brute, num_workers, hash, hash_type}, _) do
-    Cracker.Generator.init_ascii(@ascii_upperbound)
-
-    # Start up workers
-    workers = Enum.reduce(1..num_workers, [], fn _, workers ->
-      {:ok, pid} = Cracker.Worker.start_link
-      [pid | workers]
-    end)
-
-    {:noreply, {workers, hash, hash_type}}
-  end
-
   def handle_cast({:mask, num_workers, hash, hash_type, mask}, _) do
     # Start up workers
     workers = Enum.reduce(1..num_workers, [], fn _, workers ->
@@ -83,13 +74,6 @@ defmodule Cracker.Dispatcher do
        Cracker.Worker.mask_attack_increment(enums, start, stop,
                                             hash, hash_type, worker)
        end)
-    {:noreply, {workers, hash, hash_type}}
-  end
-
-
-  def handle_cast({:work_ready, enum}, {workers, hash, hash_type}) do
-    pid = Enum.random workers
-    Cracker.Worker.start_work(enum, hash, hash_type, pid)
     {:noreply, {workers, hash, hash_type}}
   end
 
