@@ -32,6 +32,7 @@ defmodule Cracker.Util do
     chunk(enum, num_chunks-1, chunk_size, acc)
   end
 
+  # TODO: is this really needed?
   def listify(x) when is_list(x) do
     x
   end
@@ -41,7 +42,9 @@ defmodule Cracker.Util do
 
   def product(enums, results \\ [[]]) do
     Enum.reduce(enums, results, fn enum, acc ->
-      for x <- enum, y <- acc, do: listify(y) ++ listify(x)
+      Stream.flat_map(enum, fn x ->
+        Stream.map(acc, fn y -> listify(y) ++ listify(x) end)
+      end)
     end)
   end
 

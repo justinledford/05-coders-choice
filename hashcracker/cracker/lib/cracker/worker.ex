@@ -33,7 +33,7 @@ defmodule Cracker.Worker do
 
   def handle_cast({:mask_attack, enums, hash, hash_type}, _) do
     Cracker.Util.product(enums)
-    |> Enum.map(&Enum.join/1)
+    |> Stream.map(&Enum.join/1)
     |> Cracker.Cracker.find_matching_hash(hash, hash_type)
     |> message_dispatcher
     {:noreply, nil}
@@ -50,7 +50,7 @@ defmodule Cracker.Worker do
 
       results = Cracker.Util.product(enums_partial, results)
       results
-      |> Enum.map(&Enum.join/1)
+      |> Stream.map(&Enum.join/1)
       |> Cracker.Cracker.find_matching_hash(hash, hash_type)
       |> mask_increment_update
 
