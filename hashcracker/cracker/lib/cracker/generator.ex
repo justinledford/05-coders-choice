@@ -59,12 +59,8 @@ defmodule Cracker.Generator do
 
   defp ascii_strings(max_length) do
     ?\ ..?~
-    |> string_list
+    |> Cracker.Util.string_list
     |> generate(max_length)
-  end
-
-  defp string_list(range) do
-    for n <- range, do: << n :: utf8 >>
   end
 
   defp _generate(source, target) do
