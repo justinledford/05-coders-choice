@@ -77,15 +77,30 @@ defmodule Cracker.Dispatcher do
     {:noreply, {workers, hash, hash_type}}
   end
 
+  # Found pass, but last worker sent not found
+  def handle_cast({:not_found, pid}, {[], hash, hash_type}) do
+    {:noreply, {[], hash, hash_type}}
+  end
+
   def handle_cast({:not_found, pid}, {[ worker | [] ], hash, hash_type}) do
-    GenServer.stop(pid)
-    IO.puts "pass not found"
+    case Process.alive?(pid) do
+      true ->
+        GenServer.stop(pid)
+        IO.puts "pass not found"
+      false ->
+        nil
+    end
     # TODO: report to client that pass not found
     {:noreply, {[], hash, hash_type}}
   end
 
   def handle_cast({:not_found, pid}, {workers, hash, hash_type}) do
-    GenServer.stop(pid)
+    case Process.alive?(pid) do
+      true ->
+        GenServer.stop(pid)
+      false ->
+        nil
+    end
     workers = Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
     {:noreply, {workers, hash, hash_type}}
   end
