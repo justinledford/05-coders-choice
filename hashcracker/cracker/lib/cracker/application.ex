@@ -6,9 +6,6 @@ defmodule Cracker.Application do
       %{id: Cracker.Generator,
         start: {Cracker.Generator, :start_link, []},
         restart: :transient},
-      %{id: Cracker.Queue,
-        start: {Cracker.Queue, :start_link, []},
-        restart: :transient},
       %{id: Cracker.Dispatcher,
         start: {Cracker.Dispatcher, :start_link, []},
         restart: :transient}
