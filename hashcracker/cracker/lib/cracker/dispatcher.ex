@@ -1,7 +1,6 @@
 defmodule Cracker.Dispatcher do
   use GenServer
 
-  @num_strings 65536
   @brute_force_upper_bound 64
 
   #####
@@ -26,10 +25,6 @@ defmodule Cracker.Dispatcher do
   def start_mask_increment(num_workers, hash, hash_type, mask, start, stop) do
     GenServer.cast(__MODULE__,
                    {:mask, num_workers, hash, hash_type, mask, start, stop})
-  end
-
-  def work_ready(work) do
-    GenServer.cast __MODULE__, {:work_ready, work}
   end
 
   def not_found(pid) do
@@ -83,11 +78,11 @@ defmodule Cracker.Dispatcher do
   end
 
   # Found pass, but last worker sent not found
-  def handle_cast({:not_found, pid}, {[], hash, hash_type}) do
+  def handle_cast({:not_found, _}, {[], hash, hash_type}) do
     {:noreply, {[], hash, hash_type}}
   end
 
-  def handle_cast({:not_found, pid}, {[ worker | [] ], hash, hash_type}) do
+  def handle_cast({:not_found, pid}, {[ _ | [] ], hash, hash_type}) do
     case Process.alive?(pid) do
       true ->
         GenServer.stop(pid)
