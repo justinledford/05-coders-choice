@@ -1,0 +1,8 @@
+-word list worker task
+-front end client
+-server
+-supervisor
+-datastores
+-distributed nodes
+-opencl/cuda
+-markov chain generators
