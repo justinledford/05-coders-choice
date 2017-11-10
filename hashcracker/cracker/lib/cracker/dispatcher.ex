@@ -107,7 +107,7 @@ defmodule Cracker.Dispatcher do
 
   def handle_cast({:found_pass, pass}, {workers, hash, hash_type}) do
     Enum.map(workers, fn worker ->
-      GenServer.stop(worker)
+      Process.exit(worker, :kill)
     end)
     IO.puts pass
     IO.puts DateTime.utc_now()
