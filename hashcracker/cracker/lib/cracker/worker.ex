@@ -13,12 +13,12 @@ defmodule Cracker.Worker do
   end
 
   # Given enums, get product to generate candidates
-  def mask_attack(enums, hash, hash_type, pid) do
-    GenServer.cast(pid, {:mask_attack, enums, hash, hash_type})
+  def mask_attack(chunk, mask, hash, hash_type, pid) do
+    GenServer.cast(pid, {:mask_attack, chunk, mask, hash, hash_type})
   end
 
-  def mask_attack_increment(enums, start, stop, hash, hash_type, pid) do
-    GenServer.cast(pid, {:mask_attack_increment, enums, start, stop,
+  def mask_attack_increment(chunk, mask, start, stop, hash, hash_type, pid) do
+    GenServer.cast(pid, {:mask_attack_increment, chunk, mask, start, stop,
                          hash, hash_type})
   end
 
@@ -31,7 +31,9 @@ defmodule Cracker.Worker do
     {:noreply, nil}
   end
 
-  def handle_cast({:mask_attack, enums, hash, hash_type}, _) do
+  def handle_cast({:mask_attack, chunk, mask, hash, hash_type}, _) do
+    tail_enums = Cracker.Util.mask_to_enums(mask)
+    enums = [ chunk | tail_enums ]
     Cracker.Util.product(enums)
     |> Stream.map(&Enum.join/1)
     |> Cracker.Cracker.find_matching_hash(hash, hash_type)
@@ -41,7 +43,9 @@ defmodule Cracker.Worker do
 
   # TODO: make this not ugly
   def handle_cast(
-    {:mask_attack_increment, enums, start, stop, hash, hash_type}, _) do
+    {:mask_attack_increment, chunk, mask, start, stop, hash, hash_type}, _) do
+    tail_enums = Cracker.Util.mask_to_enums(mask)
+    enums = [ chunk | tail_enums ]
 
     enums_partial = Enum.take(enums, start)
     enums = Enum.drop(enums, start)

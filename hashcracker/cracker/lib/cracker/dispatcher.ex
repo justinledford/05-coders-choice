@@ -48,30 +48,35 @@ defmodule Cracker.Dispatcher do
       {:ok, pid} = Cracker.Worker.start_link
       [pid | workers]
     end)
-    [ h | t ] = Cracker.Util.mask_to_enums(mask)
-    h
+
+    # Get chunks of first enum, and remaining mask and send to workers
+    [ h | [ mask ] ] = String.split(mask, "?", trim: true, parts: 2)
+    [ h_enum | _ ] = Cracker.Util.mask_to_enums(h)
+    h_enum
     |> Cracker.Util.chunk(num_workers)
-    |> Enum.map(fn enum -> [enum | t] end)
     |> Enum.zip(workers)
-    |> Enum.map(fn {enums, worker} ->
-         Cracker.Worker.mask_attack(enums, hash, hash_type, worker)
+    |> Enum.map(fn {chunk, worker} ->
+         Cracker.Worker.mask_attack(chunk, mask, hash, hash_type, worker)
        end)
     {:noreply, {workers, hash, hash_type}}
   end
 
+  # TODO: DRY
   def handle_cast({:mask, num_workers, hash, hash_type, mask, start, stop}, _) do
     # Start up workers
     workers = Enum.reduce(1..num_workers, [], fn _, workers ->
       {:ok, pid} = Cracker.Worker.start_link
       [pid | workers]
     end)
-    [ h | t ] = Cracker.Util.mask_to_enums(mask)
-    h
+
+    # Get chunks of first enum, and remaining mask and send to workers
+    [ h | [ mask ] ] = String.split(mask, "?", trim: true, parts: 2)
+    [ h_enum | _ ] = Cracker.Util.mask_to_enums(h)
+    h_enum
     |> Cracker.Util.chunk(num_workers)
-    |> Enum.map(fn enum -> [enum | t] end)
     |> Enum.zip(workers)
-    |> Enum.map(fn {enums, worker} ->
-       Cracker.Worker.mask_attack_increment(enums, start, stop,
+    |> Enum.map(fn {chunk, worker} ->
+       Cracker.Worker.mask_attack_increment(chunk, mask, start, stop,
                                             hash, hash_type, worker)
        end)
     {:noreply, {workers, hash, hash_type}}
