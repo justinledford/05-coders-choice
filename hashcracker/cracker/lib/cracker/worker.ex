@@ -49,31 +49,42 @@ defmodule Cracker.Worker do
 
     enums_partial = Enum.take(enums, start)
     enums = Enum.drop(enums, start)
-    Enum.reduce(start..stop, {enums_partial, [[]]},
-                fn i, {enums_partial, results} ->
+    mask_increment_loop(hash, hash_type, stop-start,
+                        enums, enums_partial, [[]])
+    |> message_dispatcher
 
-      results = Cracker.Util.product(enums_partial, results)
-      results
-      |> Stream.map(&Enum.join/1)
-      |> Cracker.Cracker.find_matching_hash(hash, hash_type)
-      |> mask_increment_update
-
-      enums_partial = Enum.take(enums, 1)
-      enums = Enum.drop(enums, 1)
-
-      {enums_partial, results}
-    end)
-
-    message_dispatcher(nil)
     {:noreply, nil}
   end
 
   #####
   #
 
+  def mask_increment_loop(_,_,0,_,_,_) do
+    nil
+  end
+  def mask_increment_loop(hash, hash_type, i, enums, enums_partial, results) do
+    results = Cracker.Util.product(enums_partial, results)
+    found = results
+    |> Stream.map(&Enum.join/1)
+    |> Cracker.Cracker.find_matching_hash(hash, hash_type)
+
+    # TODO: get rid of case
+    case found do
+      nil ->
+        enums_partial = Enum.take(enums, 1)
+        enums = Enum.drop(enums, 1)
+        mask_increment_loop(hash, hash_type, i-1, enums, enums_partial, results)
+      found ->
+        found
+    end
+  end
+
+
   defp mask_increment_update(nil) do
+    IO.puts "mask increment update nil"
   end
   defp mask_increment_update({pass, _}) do
+    IO.puts "mask increment update found"
     Cracker.Dispatcher.found_pass(pass)
   end
 

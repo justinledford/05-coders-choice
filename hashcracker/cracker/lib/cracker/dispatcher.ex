@@ -2,7 +2,7 @@ defmodule Cracker.Dispatcher do
   use GenServer
 
   @num_strings 65536
-  @brute_force_upper_bound 3
+  @brute_force_upper_bound 64
 
   #####
   # External API
