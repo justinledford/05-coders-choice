@@ -59,7 +59,7 @@ defmodule Cracker.Worker do
   #####
   #
 
-  def mask_increment_loop(_,_,0,_,_,_) do
+  def mask_increment_loop(_,_,-1,_,_,_) do
     nil
   end
   def mask_increment_loop(hash, hash_type, i, enums, enums_partial, results) do
