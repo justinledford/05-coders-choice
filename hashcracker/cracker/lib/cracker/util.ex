@@ -48,4 +48,8 @@ defmodule Cracker.Util do
     end)
   end
 
+  def seek_to_newline(f) do
+
+  end
+
 end

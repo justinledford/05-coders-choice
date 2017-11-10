@@ -29,6 +29,12 @@ defmodule Cracker.Dispatcher do
                      mask, start, stop, client_pid})
   end
 
+  def start_dictionary(num_workers, hash, hash_type, wordlist_path, client_pid) do
+    GenServer.cast(__MODULE__,
+                   {:dictionary, num_workers, hash, hash_type,
+                     wordlist_path, client_pid})
+  end
+
   def not_found(pid) do
     GenServer.cast __MODULE__, {:not_found, pid}
   end
@@ -80,10 +86,35 @@ defmodule Cracker.Dispatcher do
     {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
-  # Found pass, but last worker sent not found
+  def handle_cast({:dictionary, num_workers, hash, hash_type, wordlist_path, client_pid}, _) do
+    workers = start_workers(num_workers)
+
+    # Get length of file in bytes, find start/stop bytes
+    # for each worker
+    chunk_size = wordlist_path
+    |> File.stat!
+    |> Map.get(:size)
+    |> div(num_workers)
+
+    chunk_bounds = Enum.map(0..num_workers-1, fn i ->
+      {i*chunk_size, (i+1)*chunk_size}
+    end)
+
+    Enum.zip(workers, chunk_bounds)
+    |> Enum.map(fn {worker, bounds} ->
+        Cracker.Worker.dictionary_attack(bounds, wordlist_path,
+                                         hash, hash_type, worker)
+    end)
+
+    {:noreply, {workers, hash, hash_type, client_pid}}
+  end
+
+  ##################################################
+  # Messages from workers
+  ##################################################
   def handle_cast({:not_found, _}, {[], hash, hash_type, client_pid}) do
     send client_pid, {:pass_not_found, nil}
-    {:noreply, {[], hash, hash_type}}
+    {:noreply, {[], hash, hash_type, client_pid}}
   end
 
   def handle_cast({:not_found, pid}, {[ _ | [] ], hash, hash_type, client_pid}) do
@@ -94,7 +125,7 @@ defmodule Cracker.Dispatcher do
         nil
     end
     send client_pid, {:pass_not_found, nil}
-    {:noreply, {[], hash, hash_type}}
+    {:noreply, {[], hash, hash_type, client_pid}}
   end
 
   def handle_cast({:not_found, pid}, {workers, hash, hash_type, client_pid}) do
@@ -105,7 +136,7 @@ defmodule Cracker.Dispatcher do
         nil
     end
     workers = Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
-    {:noreply, {workers, hash, hash_type}}
+    {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
   def handle_cast({:found_pass, pass}, {workers, hash, hash_type, client_pid}) do
@@ -113,7 +144,7 @@ defmodule Cracker.Dispatcher do
       Process.exit(worker, :kill)
     end)
     send client_pid, {:pass_found, pass}
-    {:noreply, {workers, hash, hash_type}}
+    {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
   #####

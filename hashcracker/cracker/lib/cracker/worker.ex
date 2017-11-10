@@ -22,6 +22,11 @@ defmodule Cracker.Worker do
                          hash, hash_type})
   end
 
+  def dictionary_attack(chunk_size, wordlist_path, hash, hash_type, pid) do
+    GenServer.cast(pid, {:dictionary_attack, chunk_size,
+                         wordlist_path, hash, hash_type})
+  end
+
   #####
   # GenServer implementation
   def handle_cast({:work, enum, hash, hash_type}, _) do
@@ -51,6 +56,28 @@ defmodule Cracker.Worker do
     enums = Enum.drop(enums, start)
     mask_increment_loop(hash, hash_type, stop-start,
                         enums, enums_partial, [[]])
+    |> message_dispatcher
+
+    {:noreply, nil}
+  end
+
+  def handle_cast({:dictionary_attack, {start, stop}, wordlist_path, hash, hash_type}, _) do
+    f = File.open!(wordlist_path)
+    {:ok, _} = :file.position(f, start)
+
+    case start do
+      0 ->
+        nil
+      _ ->
+      # seek file to next non newline
+        IO.read(f, :line)
+    end
+
+    #convert to stream
+    f
+    |> IO.stream(:line)
+    |> Stream.map(&String.trim_trailing/1)
+    |> Cracker.Cracker.find_matching_hash(hash, hash_type)
     |> message_dispatcher
 
     {:noreply, nil}

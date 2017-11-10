@@ -1,6 +1,7 @@
 -word list worker task
 -front end client
 -server
+-show # candidates tried
 -supervisor
 -datastores
 -distributed nodes

@@ -29,4 +29,16 @@ defmodule Cracker do
         nil
     end
   end
+
+  def crack(hash, hash_type, :dictionary, wordlist_path, num_workers) do
+    Cracker.Dispatcher.start_dictionary(num_workers, hash, hash_type,
+                                        wordlist_path, self())
+    receive do
+      {:pass_found, pass} ->
+        pass
+      {:pass_not_found, nil} ->
+        nil
+    end
+  end
+
 end
