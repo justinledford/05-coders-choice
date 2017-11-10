@@ -40,11 +40,7 @@ defmodule Cracker.Dispatcher do
   #####
   # GenServer implementation
   def handle_cast({:mask, num_workers, hash, hash_type, mask, client_pid}, _) do
-    # Start up workers
-    workers = Enum.reduce(1..num_workers, [], fn _, workers ->
-      {:ok, pid} = Cracker.Worker.start_link
-      [pid | workers]
-    end)
+    workers = start_workers(num_workers)
 
     # Get chunks of first enum, and remaining mask and send to workers
 
@@ -69,11 +65,7 @@ defmodule Cracker.Dispatcher do
   # TODO: DRY
   def handle_cast({:mask, num_workers, hash, hash_type,
                    mask, start, stop, client_pid}, _) do
-    # Start up workers
-    workers = Enum.reduce(1..num_workers, [], fn _, workers ->
-      {:ok, pid} = Cracker.Worker.start_link
-      [pid | workers]
-    end)
+    workers = start_workers(num_workers)
 
     # Get chunks of first enum, and remaining mask and send to workers
     [ h | [ mask ] ] = String.split(mask, "?", trim: true, parts: 2)
@@ -122,5 +114,15 @@ defmodule Cracker.Dispatcher do
     end)
     send client_pid, {:pass_found, pass}
     {:noreply, {workers, hash, hash_type}}
+  end
+
+  #####
+  #
+
+  def start_workers(num_workers) do
+    Enum.reduce(1..num_workers, [], fn _, workers ->
+      {:ok, pid} = Cracker.Worker.start_link
+      [pid | workers]
+    end)
   end
 end
