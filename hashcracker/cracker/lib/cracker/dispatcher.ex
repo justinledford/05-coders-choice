@@ -47,7 +47,15 @@ defmodule Cracker.Dispatcher do
     end)
 
     # Get chunks of first enum, and remaining mask and send to workers
-    [ h | [ mask ] ] = String.split(mask, "?", trim: true, parts: 2)
+
+    # TODO: handle single charset mask more elegantly
+    {h, mask} = case String.split(mask, "?", trim: true, parts: 2) do
+      [ h | [ mask ] ] ->
+        {h, mask}
+      [ h | [] ] ->
+        {h, ""}
+    end
+
     [ h_enum | _ ] = Cracker.Util.mask_to_enums(h)
     h_enum
     |> Cracker.Util.chunk(num_workers)
@@ -82,6 +90,7 @@ defmodule Cracker.Dispatcher do
 
   # Found pass, but last worker sent not found
   def handle_cast({:not_found, _}, {[], hash, hash_type, client_pid}) do
+    send client_pid, {:pass_not_found, nil}
     {:noreply, {[], hash, hash_type}}
   end
 
@@ -89,11 +98,10 @@ defmodule Cracker.Dispatcher do
     case Process.alive?(pid) do
       true ->
         GenServer.stop(pid)
-        IO.puts "pass not found"
       false ->
         nil
     end
-    # TODO: report to client that pass not found
+    send client_pid, {:pass_not_found, nil}
     {:noreply, {[], hash, hash_type}}
   end
 
@@ -112,7 +120,6 @@ defmodule Cracker.Dispatcher do
     Enum.map(workers, fn worker ->
       Process.exit(worker, :kill)
     end)
-    # TODO: report to client that pass found
     send client_pid, {:pass_found, pass}
     {:noreply, {workers, hash, hash_type}}
   end
