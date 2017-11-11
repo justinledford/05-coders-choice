@@ -73,10 +73,16 @@ defmodule Cracker.Worker do
         IO.read(f, :line)
     end
 
-    #convert to stream
     f
     |> IO.stream(:line)
     |> Stream.map(&String.trim_trailing/1)
+    |> Stream.transform(0, fn line, bytes_read ->
+         if (stop-start) > bytes_read do
+           {[line], bytes_read + (String.length line) + 1}
+         else
+           {:halt, bytes_read}
+         end
+       end)
     |> Cracker.Cracker.find_matching_hash(hash, hash_type)
     |> message_dispatcher
 
