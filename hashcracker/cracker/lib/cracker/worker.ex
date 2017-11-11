@@ -62,7 +62,7 @@ defmodule Cracker.Worker do
   end
 
   def handle_cast({:dictionary_attack, {start, stop}, wordlist_path, hash, hash_type}, _) do
-    f = File.open!(wordlist_path)
+    f = File.open!(wordlist_path, [:read_ahead])
     {:ok, _} = :file.position(f, start)
 
     case start do
