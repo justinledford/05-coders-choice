@@ -46,7 +46,6 @@ defmodule Cracker.Worker do
     {:noreply, nil}
   end
 
-  # TODO: make this not ugly
   def handle_cast(
     {:mask_attack_increment, chunk, mask, start, stop, hash, hash_type}, _) do
     tail_enums = Cracker.Util.mask_to_enums(mask)
@@ -101,7 +100,6 @@ defmodule Cracker.Worker do
     |> Stream.map(&Enum.join/1)
     |> Cracker.Cracker.find_matching_hash(hash, hash_type)
 
-    # TODO: get rid of case
     case found do
       nil ->
         enums_partial = Enum.take(enums, 1)
@@ -110,15 +108,6 @@ defmodule Cracker.Worker do
       found ->
         found
     end
-  end
-
-
-  defp mask_increment_update(nil) do
-    IO.puts "mask increment update nil"
-  end
-  defp mask_increment_update({pass, _}) do
-    IO.puts "mask increment update found"
-    Cracker.Dispatcher.found_pass(pass)
   end
 
   defp message_dispatcher(nil) do

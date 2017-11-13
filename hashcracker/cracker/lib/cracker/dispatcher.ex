@@ -88,22 +88,6 @@ defmodule Cracker.Dispatcher do
   ##################################################
   # Messages from workers
   ##################################################
-  def handle_cast({:not_found, _}, {[], hash, hash_type, client_pid}) do
-    send client_pid, {:pass_not_found, nil}
-    {:noreply, {[], hash, hash_type, client_pid}}
-  end
-
-  def handle_cast({:not_found, pid}, {[ _ | [] ], hash, hash_type, client_pid}) do
-    case Process.alive?(pid) do
-      true ->
-        GenServer.stop(pid)
-      false ->
-        nil
-    end
-    send client_pid, {:pass_not_found, nil}
-    {:noreply, {[], hash, hash_type, client_pid}}
-  end
-
   def handle_cast({:not_found, pid}, {workers, hash, hash_type, client_pid}) do
     case Process.alive?(pid) do
       true ->
@@ -134,7 +118,6 @@ defmodule Cracker.Dispatcher do
   end
 
   def split_mask_head_tail(mask) do
-    # TODO: handle single charset mask more elegantly
     case String.split(mask, "?", trim: true, parts: 2) do
       [ h | [ mask ] ] ->
         {h, mask}

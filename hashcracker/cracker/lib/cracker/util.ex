@@ -23,7 +23,7 @@ defmodule Cracker.Util do
     chunk(enum, num_chunks, chunk_size, [])
     |> Enum.reverse
   end
-  def chunk(enum, 1, chunk_size, acc) do
+  def chunk(enum, 1, _chunk_size, acc) do
     [enum | acc]
   end
   def chunk(enum, num_chunks, chunk_size, acc) do
@@ -32,7 +32,6 @@ defmodule Cracker.Util do
     chunk(enum, num_chunks-1, chunk_size, acc)
   end
 
-  # TODO: is this really needed?
   def listify(x) when is_list(x) do
     x
   end
@@ -47,9 +46,4 @@ defmodule Cracker.Util do
       end)
     end)
   end
-
-  def seek_to_newline(f) do
-
-  end
-
 end
