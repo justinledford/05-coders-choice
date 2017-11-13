@@ -47,42 +47,18 @@ defmodule Cracker.Dispatcher do
   # GenServer implementation
   def handle_cast({:mask, num_workers, hash, hash_type, mask, client_pid}, _) do
     workers = start_workers(num_workers)
-
-    # Get chunks of first enum, and remaining mask and send to workers
-
-    # TODO: handle single charset mask more elegantly
-    {h, mask} = case String.split(mask, "?", trim: true, parts: 2) do
-      [ h | [ mask ] ] ->
-        {h, mask}
-      [ h | [] ] ->
-        {h, ""}
-    end
-
-    [ h_enum | _ ] = Cracker.Util.mask_to_enums(h)
-    h_enum
-    |> Cracker.Util.chunk(num_workers)
-    |> Enum.zip(workers)
-    |> Enum.map(fn {chunk, worker} ->
-         Cracker.Worker.mask_attack(chunk, mask, hash, hash_type, worker)
-       end)
+    {mask_h, mask_t} = split_mask_head_tail(mask)
+    dispatch_mask(mask_h, mask_t, num_workers, workers, hash, hash_type)
     {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
-  # TODO: DRY
   def handle_cast({:mask, num_workers, hash, hash_type,
                    mask, start, stop, client_pid}, _) do
     workers = start_workers(num_workers)
+    {mask_h, mask_t} = split_mask_head_tail(mask)
 
-    # Get chunks of first enum, and remaining mask and send to workers
-    [ h | [ mask ] ] = String.split(mask, "?", trim: true, parts: 2)
-    [ h_enum | _ ] = Cracker.Util.mask_to_enums(h)
-    h_enum
-    |> Cracker.Util.chunk(num_workers)
-    |> Enum.zip(workers)
-    |> Enum.map(fn {chunk, worker} ->
-       Cracker.Worker.mask_attack_increment(chunk, mask, start, stop,
-                                            hash, hash_type, worker)
-       end)
+    dispatch_mask_increment(mask_h, mask_t, num_workers, workers,
+                            hash, hash_type, start, stop)
     {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
@@ -155,5 +131,36 @@ defmodule Cracker.Dispatcher do
       {:ok, pid} = Cracker.Worker.start_link
       [pid | workers]
     end)
+  end
+
+  def split_mask_head_tail(mask) do
+    # TODO: handle single charset mask more elegantly
+    case String.split(mask, "?", trim: true, parts: 2) do
+      [ h | [ mask ] ] ->
+        {h, mask}
+      [ h | [] ] ->
+        {h, ""}
+    end
+  end
+
+  def dispatch_mask(mask_h, mask_t, num_workers, workers, hash, hash_type) do
+    [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
+    h_enum
+    |> Cracker.Util.chunk(num_workers)
+    |> Enum.zip(workers)
+    |> Enum.map(fn {chunk, worker} ->
+         Cracker.Worker.mask_attack(chunk, mask_t, hash, hash_type, worker)
+       end)
+  end
+
+  def dispatch_mask_increment(mask_h, mask_t, num_workers, workers, hash, hash_type, start, stop) do
+    [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
+    h_enum
+    |> Cracker.Util.chunk(num_workers)
+    |> Enum.zip(workers)
+    |> Enum.map(fn {chunk, worker} ->
+       Cracker.Worker.mask_attack_increment(chunk, mask_t, start, stop,
+                                            hash, hash_type, worker)
+       end)
   end
 end
