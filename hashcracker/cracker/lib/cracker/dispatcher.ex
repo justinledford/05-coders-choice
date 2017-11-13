@@ -95,7 +95,9 @@ defmodule Cracker.Dispatcher do
         send client_pid, {:pass_not_found, nil}
         []
       _ ->
-        Supervisor.terminate_child(Cracker.DispatcherSupervisor, pid)
+        if Process.alive?(pid) do
+          Supervisor.terminate_child(Cracker.DispatcherSupervisor, pid)
+        end
         Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
     end
     {:noreply, {workers, hash, hash_type, client_pid}}
