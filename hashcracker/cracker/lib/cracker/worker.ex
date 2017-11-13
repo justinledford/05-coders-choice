@@ -3,8 +3,8 @@ defmodule Cracker.Worker do
 
   #####
   # External API
-  def start_link do
-    GenServer.start_link(__MODULE__, [])
+  def start_link(num) do
+    GenServer.start_link(__MODULE__, [], name: String.to_atom("Worker-#{num}"))
   end
 
   # Take enum and start hasing
