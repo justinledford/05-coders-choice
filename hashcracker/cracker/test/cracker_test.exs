@@ -42,19 +42,36 @@ defmodule CrackerTest do
     assert pass == pass_guess
   end
 
-  #test "dictionary attack" do
-  #  hash_type = :md5
-  #  pass = "foo"
-  #  hash = :crypto.hash(hash_type, pass)
-  #  pass_guess = Cracker.crack(hash, hash_type, :dictionary, "wordlist.txt", 1)
-  #  assert pass == pass_guess
-  #end
+  test "mask attack pass not found" do
+    hash_type = :md5
+    pass = "f"
+    hash = :crypto.hash(hash_type, pass)
+    pass_guess = Cracker.crack(hash, hash_type, :mask, "?l?l?l", 1)
+    assert nil == pass_guess
+  end
 
-  #test "dictionary attack, multiple workers" do
-  #  hash_type = :md5
-  #  pass = "foo"
-  #  hash = :crypto.hash(hash_type, pass)
-  #  pass_guess = Cracker.crack(hash, hash_type, :dictionary, "wordlist.txt", 4)
-  #  assert pass == pass_guess
-  #end
+  test "dictionary attack" do
+    hash_type = :md5
+    pass = "foo"
+    hash = :crypto.hash(hash_type, pass)
+    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 1)
+    assert pass == pass_guess
+  end
+
+  test "dictionary attack, multiple workers" do
+    hash_type = :md5
+    pass = "foo"
+    hash = :crypto.hash(hash_type, pass)
+    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 4)
+    assert pass == pass_guess
+  end
+
+  test "dictionary attack pass not found" do
+    hash_type = :md5
+    pass = "f"
+    hash = :crypto.hash(hash_type, pass)
+    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 4)
+    assert nil == pass_guess
+  end
+
 end
