@@ -89,20 +89,20 @@ defmodule Cracker.Dispatcher do
   # Messages from workers
   ##################################################
   def handle_cast({:not_found, pid}, {workers, hash, hash_type, client_pid}) do
-    case Process.alive?(pid) do
-      true ->
-        GenServer.stop(pid)
-      false ->
-        nil
+    workers = case Enum.count(workers) do
+      1 ->
+        Supervisor.stop(Cracker.DispatcherSupervisor)
+        send client_pid, {:pass_not_found, nil}
+        []
+      _ ->
+        Supervisor.terminate_child(Cracker.DispatcherSupervisor, pid)
+        Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
     end
-    workers = Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
     {:noreply, {workers, hash, hash_type, client_pid}}
   end
 
   def handle_cast({:found_pass, pass}, {workers, hash, hash_type, client_pid}) do
-    Enum.map(workers, fn worker ->
-      Process.exit(worker, :kill)
-    end)
+    Supervisor.stop(Cracker.DispatcherSupervisor)
     send client_pid, {:pass_found, pass}
     {:noreply, {workers, hash, hash_type, client_pid}}
   end
@@ -111,10 +111,9 @@ defmodule Cracker.Dispatcher do
   #
 
   def start_workers(num_workers) do
-    Enum.reduce(1..num_workers, [], fn _, workers ->
-      {:ok, pid} = Cracker.Worker.start_link
-      [pid | workers]
-    end)
+    {:ok, _} = Cracker.DispatcherSupervisor.start_link(num_workers)
+    Supervisor.which_children(Cracker.DispatcherSupervisor)
+    |> Enum.map(fn {_, pid, _, _} -> pid end)
   end
 
   def split_mask_head_tail(mask) do

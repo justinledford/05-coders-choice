@@ -15,7 +15,6 @@ defmodule Cracker.DispatcherSupervisor do
         type: :worker
       }
     end)
-    IO.inspect workers
     Supervisor.init(workers, strategy: :one_for_one)
   end
 
