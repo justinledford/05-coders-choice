@@ -3,74 +3,100 @@ defmodule CrackerTest do
   doctest Cracker
 
   test "brute force attack" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :brute, 1)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :brute,
+                num_workers: 1}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "brute force attack, multiple workers" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :brute, 4)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :brute,
+                num_workers: 4}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "mask attack" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :mask, "?l?l?l", 1)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :mask,
+                mask: "?l?l?l",
+                num_workers: 1}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "mask attack 1 char mask" do
-    hash_type = :md5
     pass = "f"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :mask, "?l", 1)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :mask,
+                mask: "?l",
+                num_workers: 1}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "mask attack, multiple workers" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :mask, "?l?l?l", 4)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :mask,
+                mask: "?l?l?l",
+                num_workers: 4}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
+
   end
 
   test "mask attack pass not found" do
-    hash_type = :md5
-    pass = "f"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :mask, "?l?l?l", 1)
+    pass = "foo"
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :mask,
+                mask: "?l",
+                num_workers: 4}
+    pass_guess = Cracker.crack(options)
     assert nil == pass_guess
   end
 
   test "dictionary attack" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 1)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :dictionary,
+                wordlist_path: "test/wordlist.txt",
+                num_workers: 1}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "dictionary attack, multiple workers" do
-    hash_type = :md5
     pass = "foo"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 4)
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :dictionary,
+                wordlist_path: "test/wordlist.txt",
+                num_workers: 4}
+    pass_guess = Cracker.crack(options)
     assert pass == pass_guess
   end
 
   test "dictionary attack pass not found" do
-    hash_type = :md5
-    pass = "f"
-    hash = :crypto.hash(hash_type, pass)
-    pass_guess = Cracker.crack(hash, hash_type, :dictionary, "test/wordlist.txt", 4)
+    pass = "foobarbaz"
+    options = %{hash: :crypto.hash(:md5, pass),
+                hash_type: :md5,
+                attack: :dictionary,
+                wordlist_path: "test/wordlist.txt",
+                num_workers: 4}
+    pass_guess = Cracker.crack(options)
     assert nil == pass_guess
   end
 

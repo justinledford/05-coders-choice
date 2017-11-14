@@ -10,29 +10,23 @@ defmodule Cracker.Dispatcher do
   end
 
   # Just mask increment with mask ?a up to 64 (arbitrary upper bound)
-  def start_brute_force(num_workers, hash, hash_type, client_pid) do
+  def start_brute_force(state) do
     mask = String.duplicate("?a", @brute_force_upper_bound)
-    GenServer.cast(__MODULE__,
-                   {:mask, num_workers, hash, hash_type,
-                     mask, 1, @brute_force_upper_bound, client_pid})
+    state = Map.merge(state, %{mask: mask, start: 1,
+                                   stop: @brute_force_upper_bound})
+    GenServer.cast(__MODULE__, {:mask_increment, state})
   end
 
-  def start_mask(num_workers, hash, hash_type, mask, client_pid) do
-    GenServer.cast(__MODULE__,
-                   {:mask, num_workers, hash, hash_type, mask, client_pid})
+  def start_mask(state) do
+    GenServer.cast(__MODULE__, {:mask, state})
   end
 
-  def start_mask_increment(num_workers, hash, hash_type, mask,
-                           start, stop, client_pid) do
-    GenServer.cast(__MODULE__,
-                   {:mask, num_workers, hash, hash_type,
-                     mask, start, stop, client_pid})
+  def start_mask_increment(state) do
+    GenServer.cast(__MODULE__, {:mask_increment, state})
   end
 
-  def start_dictionary(num_workers, hash, hash_type, wordlist_path, client_pid) do
-    GenServer.cast(__MODULE__,
-                   {:dictionary, num_workers, hash, hash_type,
-                     wordlist_path, client_pid})
+  def start_dictionary(state) do
+    GenServer.cast(__MODULE__, {:dictionary, state})
   end
 
   def not_found(pid) do
@@ -45,68 +39,40 @@ defmodule Cracker.Dispatcher do
 
   #####
   # GenServer implementation
-  def handle_cast({:mask, num_workers, hash, hash_type, mask, client_pid}, _) do
-    workers = start_workers(num_workers)
-    {mask_h, mask_t} = split_mask_head_tail(mask)
-    dispatch_mask(mask_h, mask_t, num_workers, workers, hash, hash_type)
-    {:noreply, {workers, hash, hash_type, client_pid}}
+  def handle_cast({:mask, state}, _) do
+    workers = start_workers(state.num_workers)
+    state = Map.put(state, :workers, workers)
+    dispatch_mask(state)
+    {:noreply, state}
   end
 
-  def handle_cast({:mask, num_workers, hash, hash_type,
-                   mask, start, stop, client_pid}, _) do
-    workers = start_workers(num_workers)
-    {mask_h, mask_t} = split_mask_head_tail(mask)
-
-    dispatch_mask_increment(mask_h, mask_t, num_workers, workers,
-                            hash, hash_type, start, stop)
-    {:noreply, {workers, hash, hash_type, client_pid}}
+  def handle_cast({:mask_increment, state}, _) do
+    workers = start_workers(state.num_workers)
+    state = Map.put(state, :workers, workers)
+    dispatch_mask_increment(state)
+    {:noreply, state}
   end
 
-  def handle_cast({:dictionary, num_workers, hash, hash_type, wordlist_path, client_pid}, _) do
-    workers = start_workers(num_workers)
-
-    # Get length of file in bytes, find start/stop bytes
-    # for each worker
-    chunk_size = wordlist_path
-    |> File.stat!
-    |> Map.get(:size)
-    |> div(num_workers)
-
-    chunk_bounds = Enum.map(0..num_workers-1, fn i ->
-      {i*chunk_size, (i+1)*chunk_size}
-    end)
-
-    Enum.zip(workers, chunk_bounds)
-    |> Enum.map(fn {worker, bounds} ->
-        Cracker.Worker.dictionary_attack(bounds, wordlist_path,
-                                         hash, hash_type, worker)
-    end)
-
-    {:noreply, {workers, hash, hash_type, client_pid}}
+  def handle_cast({:dictionary, state}, _) do
+    workers = start_workers(state.num_workers)
+    state = Map.put(state, :workers, workers)
+    dispatch_dictionary(state)
+    {:noreply, state}
   end
 
   ##################################################
   # Messages from workers
   ##################################################
-  def handle_cast({:not_found, pid}, {workers, hash, hash_type, client_pid}) do
-    workers = case Enum.count(workers) do
-      1 ->
-        Supervisor.stop(Cracker.DispatcherSupervisor)
-        send client_pid, {:pass_not_found, nil}
-        []
-      _ ->
-        if Process.alive?(pid) do
-          Supervisor.terminate_child(Cracker.DispatcherSupervisor, pid)
-        end
-        Enum.filter(workers, fn worker_pid -> worker_pid != pid end)
-    end
-    {:noreply, {workers, hash, hash_type, client_pid}}
+  def handle_cast({:not_found, worker}, state) do
+    alive = Process.alive?(worker)
+    state = worker_done(worker, state, Enum.count(state.workers), alive)
+    {:noreply, state}
   end
 
-  def handle_cast({:found_pass, pass}, {workers, hash, hash_type, client_pid}) do
+  def handle_cast({:found_pass, pass}, state) do
     Supervisor.stop(Cracker.DispatcherSupervisor)
-    send client_pid, {:pass_found, pass}
-    {:noreply, {workers, hash, hash_type, client_pid}}
+    send state.client_pid, {:pass_found, pass}
+    {:noreply, state}
   end
 
   #####
@@ -127,24 +93,66 @@ defmodule Cracker.Dispatcher do
     end
   end
 
-  def dispatch_mask(mask_h, mask_t, num_workers, workers, hash, hash_type) do
+  def dispatch_mask(state) do
+    {mask_h, mask_t} = split_mask_head_tail(state.mask)
     [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
     h_enum
-    |> Cracker.Util.chunk(num_workers)
-    |> Enum.zip(workers)
-    |> Enum.map(fn {chunk, worker} ->
-         Cracker.Worker.mask_attack(chunk, mask_t, hash, hash_type, worker)
-       end)
+    |> Cracker.Util.chunk(state.num_workers)
+    |> Enum.zip(state.workers)
+    |> Enum.map(
+      fn {chunk, worker} ->
+        Map.drop(state, [:workers])
+        |> Map.merge(%{chunk: chunk, worker: worker, mask_t: mask_t})
+        |> Cracker.Worker.mask_attack
+      end)
   end
 
-  def dispatch_mask_increment(mask_h, mask_t, num_workers, workers, hash, hash_type, start, stop) do
+  def dispatch_mask_increment(state) do
+    {mask_h, mask_t} = split_mask_head_tail(state.mask)
     [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
     h_enum
-    |> Cracker.Util.chunk(num_workers)
-    |> Enum.zip(workers)
-    |> Enum.map(fn {chunk, worker} ->
-       Cracker.Worker.mask_attack_increment(chunk, mask_t, start, stop,
-                                            hash, hash_type, worker)
-       end)
+    |> Cracker.Util.chunk(state.num_workers)
+    |> Enum.zip(state.workers)
+    |> Enum.map(
+      fn {chunk, worker} ->
+        Map.drop(state, [:workers])
+        |> Map.merge(%{chunk: chunk, worker: worker, mask_t: mask_t})
+        |> Cracker.Worker.mask_attack_increment
+      end)
   end
+
+  def dispatch_dictionary(state) do
+    chunk_size = state.wordlist_path
+    |> File.stat!
+    |> Map.get(:size)
+    |> div(state.num_workers)
+
+    chunk_bounds = Enum.map(0..state.num_workers-1, fn i ->
+      {i*chunk_size, (i+1)*chunk_size}
+    end)
+
+    Enum.zip(state.workers, chunk_bounds)
+    |> Enum.map(fn {worker, {start, stop}} ->
+        state
+        |> Map.drop([:workers])
+        |> Map.merge(%{worker: worker, start: start, stop: stop})
+        |> Cracker.Worker.dictionary_attack
+    end)
+  end
+
+  def worker_done(_worker, state, 1, _alive) do
+    Supervisor.stop(Cracker.DispatcherSupervisor)
+    send state.client_pid, {:pass_not_found, nil}
+    state
+  end
+  def worker_done(worker, state, _worker_count, true) do
+    Supervisor.terminate_child(Cracker.DispatcherSupervisor, worker)
+    workers = Enum.filter(state.workers, fn worker_ -> worker_ != worker end)
+    Map.put(state, :workers, workers)
+  end
+  def worker_done(worker, state, _worker_count, false) do
+    workers = Enum.filter(state.workers, fn worker_ -> worker_ != worker end)
+    Map.put(state, :workers, workers)
+  end
+
 end

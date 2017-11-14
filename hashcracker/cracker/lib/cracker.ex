@@ -1,6 +1,9 @@
 defmodule Cracker do
-  def crack(hash, hash_type, :brute, num_workers) do
-    Cracker.Dispatcher.start_brute_force(num_workers, hash, hash_type, self())
+  def crack(options=%{attack: :brute}) do
+    options
+    |> Map.put(:client_pid, self())
+    |> Cracker.Dispatcher.start_brute_force
+
     receive do
       {:pass_found, pass} ->
         pass
@@ -9,8 +12,11 @@ defmodule Cracker do
     end
   end
 
-  def crack(hash, hash_type, :mask, mask, num_workers) do
-    Cracker.Dispatcher.start_mask(num_workers, hash, hash_type, mask, self())
+  def crack(options=%{attack: :mask}) do
+    options
+    |> Map.put(:client_pid, self())
+    |> Cracker.Dispatcher.start_mask
+
     receive do
       {:pass_found, pass} ->
         pass
@@ -19,9 +25,11 @@ defmodule Cracker do
     end
   end
 
-  def crack(hash, hash_type, :mask_increment, mask, start, stop, num_workers) do
-    Cracker.Dispatcher.start_mask_increment(num_workers, hash, hash_type,
-                                            mask, start, stop, self())
+  def crack(options=%{attack: :mask_increment}) do
+    options
+    |> Map.put(:client_pid, self())
+    |> Cracker.Dispatcher.start_mask_increment
+
     receive do
       {:pass_found, pass} ->
         pass
@@ -30,9 +38,11 @@ defmodule Cracker do
     end
   end
 
-  def crack(hash, hash_type, :dictionary, wordlist_path, num_workers) do
-    Cracker.Dispatcher.start_dictionary(num_workers, hash, hash_type,
-                                        wordlist_path, self())
+  def crack(options=%{attack: :dictionary}) do
+    options
+    |> Map.put(:client_pid, self())
+    |> Cracker.Dispatcher.start_dictionary
+
     receive do
       {:pass_found, pass} ->
         pass

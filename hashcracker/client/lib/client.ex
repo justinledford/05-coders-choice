@@ -1,18 +1,5 @@
 defmodule Client do
-  @moduledoc """
-  Documentation for Client.
-  """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Client.hello
-      :world
-
-  """
-  def hello do
-    :world
+  def main(args) do
+    IO.inspect args
   end
 end

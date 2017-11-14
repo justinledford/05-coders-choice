@@ -13,18 +13,16 @@ defmodule Cracker.Worker do
   end
 
   # Given enums, get product to generate candidates
-  def mask_attack(chunk, mask, hash, hash_type, pid) do
-    GenServer.cast(pid, {:mask_attack, chunk, mask, hash, hash_type})
+  def mask_attack(state) do
+    GenServer.cast(state.worker, {:mask_attack, state})
   end
 
-  def mask_attack_increment(chunk, mask, start, stop, hash, hash_type, pid) do
-    GenServer.cast(pid, {:mask_attack_increment, chunk, mask, start, stop,
-                         hash, hash_type})
+  def mask_attack_increment(state) do
+    GenServer.cast(state.worker, {:mask_attack_increment, state})
   end
 
-  def dictionary_attack(chunk_size, wordlist_path, hash, hash_type, pid) do
-    GenServer.cast(pid, {:dictionary_attack, chunk_size,
-                         wordlist_path, hash, hash_type})
+  def dictionary_attack(state) do
+    GenServer.cast(state.worker, {:dictionary_attack, state})
   end
 
   #####
@@ -36,35 +34,34 @@ defmodule Cracker.Worker do
     {:noreply, nil}
   end
 
-  def handle_cast({:mask_attack, chunk, mask, hash, hash_type}, _) do
-    tail_enums = Cracker.Util.mask_to_enums(mask)
-    enums = [ chunk | tail_enums ]
+  def handle_cast({:mask_attack, state}, _) do
+    tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
+    enums = [ state.chunk | tail_enums ]
     Cracker.Util.product(enums)
     |> Stream.map(&Enum.join/1)
-    |> Cracker.Cracker.find_matching_hash(hash, hash_type)
+    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher
     {:noreply, nil}
   end
 
-  def handle_cast(
-    {:mask_attack_increment, chunk, mask, start, stop, hash, hash_type}, _) do
-    tail_enums = Cracker.Util.mask_to_enums(mask)
-    enums = [ chunk | tail_enums ]
+  def handle_cast({:mask_attack_increment, state}, _) do
+    tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
+    enums = [ state.chunk | tail_enums ]
 
-    enums_partial = Enum.take(enums, start)
-    enums = Enum.drop(enums, start)
-    mask_increment_loop(hash, hash_type, stop-start,
-                        enums, enums_partial, [[]])
+    enums_partial = Enum.take(enums, state.start)
+    enums = Enum.drop(enums, state.start)
+    Map.merge(state, %{enums: enums, enums_partial: enums_partial})
+    |> mask_increment_loop(state.stop-state.start, [[]])
     |> message_dispatcher
 
     {:noreply, nil}
   end
 
-  def handle_cast({:dictionary_attack, {start, stop}, wordlist_path, hash, hash_type}, _) do
-    f = File.open!(wordlist_path, [:read_ahead])
-    {:ok, _} = :file.position(f, start)
+  def handle_cast({:dictionary_attack, state}, _) do
+    f = File.open!(state.wordlist_path, [:read_ahead])
+    {:ok, _} = :file.position(f, state.start)
 
-    case start do
+    case state.start do
       0 ->
         nil
       _ ->
@@ -76,13 +73,13 @@ defmodule Cracker.Worker do
     |> IO.stream(:line)
     |> Stream.map(&String.trim_trailing/1)
     |> Stream.transform(0, fn line, bytes_read ->
-         if (stop-start) > bytes_read do
+         if (state.stop-state.start) > bytes_read do
            {[line], bytes_read + (String.length line) + 1}
          else
            {:halt, bytes_read}
          end
        end)
-    |> Cracker.Cracker.find_matching_hash(hash, hash_type)
+    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher
 
     {:noreply, nil}
@@ -91,20 +88,23 @@ defmodule Cracker.Worker do
   #####
   #
 
-  def mask_increment_loop(_,_,-1,_,_,_) do
+  def mask_increment_loop(_state,-1,_results) do
     nil
   end
-  def mask_increment_loop(hash, hash_type, i, enums, enums_partial, results) do
-    results = Cracker.Util.product(enums_partial, results)
+  def mask_increment_loop(state, i, results) do
+    results = Cracker.Util.product(state.enums_partial, results)
     found = results
     |> Stream.map(&Enum.join/1)
-    |> Cracker.Cracker.find_matching_hash(hash, hash_type)
+    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
 
     case found do
       nil ->
-        enums_partial = Enum.take(enums, 1)
-        enums = Enum.drop(enums, 1)
-        mask_increment_loop(hash, hash_type, i-1, enums, enums_partial, results)
+        enums_partial = Enum.take(state.enums, 1)
+        enums = Enum.drop(state.enums, 1)
+
+        state
+        |> Map.merge(%{enums: enums, enums_partial: enums_partial})
+        |> mask_increment_loop(i-1, results)
       found ->
         found
     end
