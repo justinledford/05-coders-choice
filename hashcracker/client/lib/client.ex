@@ -63,10 +63,6 @@ defmodule Client do
     |> validation_handler(options)
   end
 
-  def valid_args? do
-
-  end
-
   def validation_handler(false, _options) do
     usage()
   end
@@ -77,7 +73,6 @@ defmodule Client do
   def print_result(nil) do
     IO.puts "Password not found..."
   end
-
   def print_result(pass) do
     IO.puts "Password found: #{pass}"
   end
