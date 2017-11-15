@@ -1,9 +1,7 @@
--word list worker task
--front end client
--server
--show # candidates tried
--supervisor
--datastores
+-combine mask/mask increment
+-show progress/# candidates tried
+-server?
+-datastores?
 -distributed nodes
 -opencl/cuda
 -markov chain generators
