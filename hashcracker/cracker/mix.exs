@@ -22,7 +22,6 @@ defmodule Cracker.Mixfile do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:stream_split, "~> 0.1.0"}
     ]
   end
 end
