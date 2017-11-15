@@ -7,23 +7,49 @@ defmodule Client do
       strict: [hash: :string, hash_type: :string,
                attack: :string, num_workers: :integer,
                wordlist_path: :string, mask: :string,
-               increment: :string]
+               increment: :string, help: :boolean]
     ]
-    {options, _} = OptionParser.parse!(args, options)
+    {options, _, _} = OptionParser.parse(args, options)
     options
     |> Enum.into(%{})
-    |> validate_options
+    |> check_for_help
+    |> validate_required_options
     |> format_required_options
+    |> validate_required_option_args
     |> validate_mode_options
     |> format_additional_options
     |> Cracker.crack
     |> print_result
   end
 
-  def validate_options(options) do
+  def check_for_help(options) do
+    Map.has_key?(options, :help)
+    |> help_handler(options)
+  end
+  def help_handler(false, options) do
+    options
+  end
+  def help_handler(true, _options) do
+    help()
+  end
+
+  def validate_required_options(options) do
     required = [:hash, :hash_type, :attack, :num_workers]
     options
     |> has_required?(required)
+  end
+
+  def format_required_options(options) do
+    options
+    |> Map.update!(:hash_type, &String.to_atom/1)
+    |> Map.update!(:attack, &String.to_atom/1)
+    |> Map.update!(:hash, fn hash -> Base.decode16!(hash, case: :mixed) end)
+  end
+
+  def validate_required_option_args(options) do
+    [:dictionary, :mask, :brute]
+    |> Enum.any?(fn x -> x == options.attack end)
+    |> validation_handler(options)
   end
 
   def validate_mode_options(options=%{attack: :mask}) do
@@ -32,18 +58,8 @@ defmodule Client do
   def validate_mode_options(options=%{attack: :dictionary}) do
     has_required?(options, [:wordlist_path])
   end
-  def validate_mode_options(options=%{attack: :mask_increment}) do
-    has_required?(options, [:mask, :increment])
-  end
   def validate_mode_options(options) do
     options
-  end
-
-  def format_required_options(options) do
-    options
-    |> Map.update!(:hash_type, &String.to_atom/1)
-    |> Map.update!(:attack, &String.to_atom/1)
-    |> Map.update!(:hash, fn hash -> Base.decode16!(hash, case: :mixed) end)
   end
 
   def format_additional_options(options=%{increment: increment}) do
@@ -80,11 +96,21 @@ defmodule Client do
   def usage do
     IO.puts \
     """
+    Usage:
+    ./hashcracker -h HASH -t HASH_TYPE -a ATTACK_MODE -n WORKERS [options]
+    ./hashcracker --help
+    """
+    System.halt(0)
+  end
+
+  def help do
+    IO.puts \
+    """
     Usage: ./hashcracker -h HASH -t HASH_TYPE -a ATTACK_MODE -n WORKERS [options]
     -h, --hash           HASH         base16 encoded hash (lower or upper case)
     -t, --hash_type      HASH_TYPE    md5 | ripemd160 | sha | sha224 | sha256 |
                                       sha384 | sha512
-    -a, --attack         ATTACK_MODE  brute | mask | mask_increment | dictionary
+    -a, --attack         ATTACK_MODE  brute | mask | dictionary
     -n, --num_workers    WORKERS      number of parallel workers
     -w, --wordlist_path  PATH         path to wordlist for dictionary attack
     -m, --mask           MASK         mask for mask attack (see section below)
