@@ -13,7 +13,7 @@ defmodule Client.Mixfile do
   end
 
   def escript do
-    [main_module: Client]
+    [main_module: Client, name: "hashcracker"]
   end
 
   # Run "mix help compile.app" to learn about applications.
