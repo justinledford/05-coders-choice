@@ -1,15 +1,15 @@
 defmodule Client do
+  @options_aliases [h: :hash, t: :hash_type, a: :attack,
+                    n: :num_workers, w: :wordlist_path,
+                    m: :mask, i: :increment]
+  @options_strict [hash: :string, hash_type: :string,
+                   attack: :string, num_workers: :integer,
+                   wordlist_path: :string, mask: :string,
+                   increment: :string, help: :boolean]
+  @options [aliases: @options_aliases, strict: @options_strict]
+
   def main(args) do
-    options = [
-      aliases: [h: :hash, t: :hash_type, a: :attack,
-                n: :num_workers, w: :wordlist_path,
-                m: :mask, i: :increment],
-      strict: [hash: :string, hash_type: :string,
-               attack: :string, num_workers: :integer,
-               wordlist_path: :string, mask: :string,
-               increment: :string, help: :boolean]
-    ]
-    {options, _, _} = OptionParser.parse(args, options)
+    {options, _, _} = OptionParser.parse(args, @options)
     options
     |> Enum.into(%{})
     |> check_for_help
