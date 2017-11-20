@@ -1,6 +1,15 @@
 defmodule Cracker.Dispatcher do
   use GenServer
 
+  def table do
+    Application.fetch_env!(:cracker, :routing_table)
+    |> Enum.into(%{})
+  end
+
+  def table(key) do
+    Map.get(table(), key)
+  end
+
   @brute_force_upper_bound 64
 
   ##################################################
@@ -16,11 +25,11 @@ defmodule Cracker.Dispatcher do
   end
 
   def not_found(pid) do
-    GenServer.cast __MODULE__, {:not_found, pid}
+    GenServer.cast {__MODULE__, table(:client)},  {:not_found, pid}
   end
 
   def found_pass(pass) do
-    GenServer.cast __MODULE__, {:found_pass, pass}
+    GenServer.cast {__MODULE__, table(:client)}, {:found_pass, pass}
   end
 
   ##################################################
@@ -40,6 +49,7 @@ defmodule Cracker.Dispatcher do
 
   def handle_cast({_mode, state}, _) do
     workers = init_workers(state.num_workers)
+    workers = Enum.zip(workers, 1..state.num_workers)
     state = Map.put(state, :workers, workers)
     dispatch(state)
     {:noreply, state}
@@ -103,8 +113,10 @@ defmodule Cracker.Dispatcher do
   end
 
   defp merge_with_key(state, key) do
-    fn {worker, x} ->
-      Map.merge(state, %{:worker => worker, key => x})
+    fn {{worker_pid, worker_num}, x} ->
+      Map.merge(state, %{:worker_pid => worker_pid,
+                         :worker_num => worker_num,
+                         key => x})
     end
   end
 

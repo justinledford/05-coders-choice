@@ -15,7 +15,10 @@ defmodule Cracker.Mixfile do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Cracker.Application, [] }
+      mod: {Cracker.Application, [] },
+      env: [routing_table: [client: :"client@localhost",
+                            worker1: :"worker1@localhost",
+                            worker2: :"worker2@localhost"]]
     ]
   end
 

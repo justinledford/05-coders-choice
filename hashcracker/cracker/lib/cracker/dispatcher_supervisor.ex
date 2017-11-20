@@ -8,7 +8,7 @@ defmodule Cracker.DispatcherSupervisor do
   def init(num_workers) do
     workers = Enum.map(1..num_workers, fn worker_num ->
       %{
-        id: "Worker-#{worker_num}",
+        id: "worker#{worker_num}",
         start: {Cracker.Worker, :start_link, [worker_num]},
         restart: :permanent,
         shutdown: 5000,
