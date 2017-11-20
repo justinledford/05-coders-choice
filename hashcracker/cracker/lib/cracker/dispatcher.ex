@@ -39,7 +39,7 @@ defmodule Cracker.Dispatcher do
   end
 
   def handle_cast({_mode, state}, _) do
-    workers = start_workers(state.num_workers)
+    workers = init_workers(state.num_workers)
     state = Map.put(state, :workers, workers)
     dispatch(state)
     {:noreply, state}
@@ -49,7 +49,7 @@ defmodule Cracker.Dispatcher do
   # Implementation
   ##################################################
 
-  defp start_workers(num_workers) do
+  defp init_workers(num_workers) do
     {:ok, _} = Cracker.DispatcherSupervisor.start_link(num_workers)
     Supervisor.which_children(Cracker.DispatcherSupervisor)
     |> Enum.map(fn {_, pid, _, _} -> pid end)
@@ -64,45 +64,52 @@ defmodule Cracker.Dispatcher do
     end
   end
 
-  defp dispatch(state=%{attack: :brute}) do
+  defp dispatch(state) do
+    state
+    |> setup_worker_states
+    |> start_workers
+  end
+
+  defp setup_worker_states(state=%{attack: :brute}) do
     mask = String.duplicate("?a", @brute_force_upper_bound)
     state
     |> Map.merge(%{mask: mask, start: 1, stop: @brute_force_upper_bound})
     |> Map.put(:attack, :mask)
-    |> dispatch
+    |> setup_worker_states
   end
 
-  defp dispatch(state=%{attack: :mask}) do
+  defp setup_worker_states(state=%{attack: :dictionary}) do
+    chunk_size = file_chunk_size(state.wordlist_path, state.num_workers)
+    starts = Enum.map(0..state.num_workers-1, &(&1*chunk_size))
+
+    state
+    |> Map.merge(%{chunk_size: chunk_size})
+    |> merge_worker_states(starts, :start)
+  end
+
+  defp setup_worker_states(state=%{attack: :mask}) do
     {mask_h, mask_t} = split_mask_head_tail(state.mask)
     [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
-    h_enum
-    |> Cracker.Util.chunk(state.num_workers)
-    |> Enum.zip(state.workers)
-    |> Enum.map(
-      fn {chunk, worker} ->
-        Map.drop(state, [:workers])
-        |> Map.merge(%{chunk: chunk, worker: worker, mask_t: mask_t})
-        |> Cracker.Worker.start_work
-      end)
+    chunks = Cracker.Util.chunk(h_enum, state.num_workers)
+
+    state
+    |> Map.merge(%{mask_t: mask_t})
+    |> merge_worker_states(chunks, :chunk)
   end
 
-  defp dispatch(state=%{attack: :dictionary}) do
-    chunk_size = state.wordlist_path
-    |> File.stat!
-    |> Map.get(:size)
-    |> div(state.num_workers)
+  defp merge_worker_states(state, xs, key) do
+    Enum.zip(state.workers, xs)
+    |> Enum.map(merge_with_key(state, key))
+  end
 
-    starts = Enum.map(0..state.num_workers-1, fn i ->
-      i*chunk_size
-    end)
+  defp merge_with_key(state, key) do
+    fn {worker, x} ->
+      Map.merge(state, %{:worker => worker, key => x})
+    end
+  end
 
-    Enum.zip(state.workers, starts)
-    |> Enum.map(fn {worker, start} ->
-        state
-        |> Map.drop([:workers])
-        |> Map.merge(%{worker: worker, start: start, chunk_size: chunk_size})
-        |> Cracker.Worker.start_work
-    end)
+  defp start_workers(worker_states) do
+    Enum.map(worker_states, &Cracker.Worker.start_work/1)
   end
 
   defp worker_done(_worker, state, worker_count) when worker_count < 2 do
@@ -113,6 +120,13 @@ defmodule Cracker.Dispatcher do
   defp worker_done(worker, state, _) do
     workers = Enum.filter(state.workers, fn worker_ -> worker_ != worker end)
     Map.put(state, :workers, workers)
+  end
+
+  defp file_chunk_size(file_path, num_chunks) do
+    file_path
+    |> File.stat!
+    |> Map.get(:size)
+    |> div(num_chunks)
   end
 
 end
