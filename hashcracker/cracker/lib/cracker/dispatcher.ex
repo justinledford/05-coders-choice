@@ -1,15 +1,6 @@
 defmodule Cracker.Dispatcher do
   use GenServer
 
-  def table do
-    Application.fetch_env!(:cracker, :routing_table)
-    |> Enum.into(%{})
-  end
-
-  def table(key) do
-    Map.get(table(), key)
-  end
-
   @brute_force_upper_bound 64
 
   ##################################################
@@ -24,20 +15,21 @@ defmodule Cracker.Dispatcher do
     GenServer.cast(__MODULE__, {mode, state})
   end
 
-  def not_found(pid) do
-    GenServer.cast {__MODULE__, table(:client)},  {:not_found, pid}
+  def not_found(pid, client_node) do
+    GenServer.cast {__MODULE__, client_node},  {:not_found, pid}
   end
 
-  def found_pass(pass) do
-    GenServer.cast {__MODULE__, table(:client)}, {:found_pass, pass}
+  def found_pass(pass, client_node) do
+    GenServer.cast {__MODULE__, client_node}, {:found_pass, pass}
   end
 
   ##################################################
   # GenServer implementation
   ##################################################
 
-  def handle_cast({:not_found, worker}, state) do
-    state = worker_done(worker, state, Enum.count(state.workers))
+  def handle_cast({:not_found, worker_pid}, state) do
+    worker_count = Enum.count(state.workers)
+    state = worker_done(worker_pid, state, worker_count)
     {:noreply, state}
   end
 
@@ -77,6 +69,7 @@ defmodule Cracker.Dispatcher do
   defp dispatch(state) do
     state
     |> setup_worker_states
+    |> assign_worker_nodes
     |> start_workers
   end
 
@@ -120,6 +113,18 @@ defmodule Cracker.Dispatcher do
     end
   end
 
+  defp get_worker(state) do
+    i = rem(state.worker_num, Enum.count(state.worker_nodes))
+    Enum.at(state.worker_nodes, i)
+  end
+
+  defp assign_worker_nodes(states) do
+    Enum.map(states, fn state ->
+      worker_node = get_worker(state)
+      Map.put(state, :worker_node, worker_node)
+    end)
+  end
+
   defp start_workers(worker_states) do
     Enum.map(worker_states, &Cracker.Worker.start_work/1)
   end
@@ -129,8 +134,10 @@ defmodule Cracker.Dispatcher do
     send state.client_pid, {:pass_not_found, nil}
     state
   end
-  defp worker_done(worker, state, _) do
-    workers = Enum.filter(state.workers, fn worker_ -> worker_ != worker end)
+  defp worker_done(worker_pid, state, _) do
+    workers = Enum.filter(state.workers, fn {pid, _} ->
+      worker_pid != pid
+    end)
     Map.put(state, :workers, workers)
   end
 

@@ -18,11 +18,11 @@ defmodule Cracker.Worker do
   ##################################################
 
   def handle_cast({:start_work, state}, _) do
-    worker_node = Cracker.Dispatcher.table(:"worker#{state.worker_num}")
-    pid = Node.spawn_link(worker_node, fn ->
+    state = Map.put(state, :worker_pid, self())
+    pid = Node.spawn_link(state.worker_node, fn ->
       Cracker.WorkerImpl.attack(state)
     end)
-    {:noreply, %{node_pid: pid}}
+    {:noreply, Map.put(state, :node_pid, pid)}
   end
 
 end

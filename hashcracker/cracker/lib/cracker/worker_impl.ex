@@ -6,7 +6,7 @@ defmodule Cracker.WorkerImpl do
     enums = Enum.drop(enums, start)
     Map.merge(state, %{enums: enums, enums_partial: enums_partial})
     |> mask_increment_loop(stop-start, [[]])
-    |> message_dispatcher
+    |> message_dispatcher(state)
   end
 
   def attack(state=%{attack: :mask}) do
@@ -15,7 +15,7 @@ defmodule Cracker.WorkerImpl do
     Cracker.Util.product(enums)
     |> Stream.map(&Enum.join/1)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
-    |> message_dispatcher
+    |> message_dispatcher(state)
   end
 
   def attack(state=%{attack: :dictionary}) do
@@ -29,7 +29,7 @@ defmodule Cracker.WorkerImpl do
          end
        end)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
-    |> message_dispatcher
+    |> message_dispatcher(state)
   end
 
   defp mask_increment_loop(_state,-1,_results) do
@@ -54,12 +54,12 @@ defmodule Cracker.WorkerImpl do
     found
   end
 
-  defp message_dispatcher(nil) do
-    Cracker.Dispatcher.not_found(self())
+  defp message_dispatcher(nil, state) do
+    Cracker.Dispatcher.not_found(state.worker_pid, state.client_node)
   end
 
-  defp message_dispatcher({pass, _}) do
-    Cracker.Dispatcher.found_pass(pass)
+  defp message_dispatcher({pass, _}, state) do
+    Cracker.Dispatcher.found_pass(pass, state.client_node)
   end
 
   defp wordlist_stream(wordlist_path, start) do
