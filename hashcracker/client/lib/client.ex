@@ -1,11 +1,13 @@
 defmodule Client do
   @options_aliases [h: :hash, t: :hash_type, a: :attack,
                     n: :num_workers, w: :wordlist_path,
-                    m: :mask, i: :increment]
+                    m: :mask, i: :increment, c: :client_node]
   @options_strict [hash: :string, hash_type: :string,
                    attack: :string, num_workers: :integer,
                    wordlist_path: :string, mask: :string,
-                   increment: :string, help: :boolean]
+                   increment: :string, help: :boolean,
+                   client: :string, worker_nodes: :string,
+                   cookie: :string]
   @options [aliases: @options_aliases, strict: @options_strict]
 
   def main(args) do
@@ -17,7 +19,9 @@ defmodule Client do
     |> format_required_options
     |> validate_required_option_args
     |> validate_mode_options
+    |> set_defaults
     |> format_additional_options
+    |> setup_node
     |> Cracker.crack
     |> print_result
   end
@@ -62,6 +66,31 @@ defmodule Client do
     options
   end
 
+  def set_defaults(options) do
+    options
+    |> set_client_node
+    |> set_worker_nodes
+  end
+
+  def set_client_node(options) do
+    case Map.has_key?(options, :client_node) do
+      true ->
+        options
+      false ->
+        {:ok, hostname} = :inet.gethostname
+        Map.put(options, :client_node, "client@#{hostname}")
+    end
+  end
+
+  def set_worker_nodes(options) do
+    case Map.has_key?(options, :worker_nodes) do
+      true ->
+        options
+      false ->
+        Map.put(options, :worker_nodes, options.client_node)
+    end
+  end
+
   def format_additional_options(options=%{increment: increment}) do
     [start, stop] = String.split(increment, ":")
                     |> Enum.map(&String.to_integer/1)
@@ -70,6 +99,19 @@ defmodule Client do
     |> Map.merge(%{start: start, stop: stop})
   end
   def format_additional_options(options) do
+    options
+    |> Map.update!(:client_node, &String.to_atom/1)
+    |> Map.update!(:worker_nodes, fn nodes ->
+      String.split(nodes, ",") |> Enum.map(&String.to_atom/1)
+    end)
+  end
+
+  def setup_node(options) do
+    {:ok, _} = Node.start(options.client_node, :shortnames)
+    if Map.has_key?(options, :cookie) do
+      Map.update!(options, :cookie, &String.to_atom/1)
+      Node.set_cookie(options.cookie)
+    end
     options
   end
 
@@ -108,13 +150,16 @@ defmodule Client do
     """
     Usage: ./hashcracker -h HASH -t HASH_TYPE -a ATTACK_MODE -n WORKERS [options]
     -h, --hash           HASH         base16 encoded hash (lower or upper case)
-    -t, --hash_type      HASH_TYPE    md5 | ripemd160 | sha | sha224 | sha256 |
+    -t, --hash-type      HASH_TYPE    md5 | ripemd160 | sha | sha224 | sha256 |
                                       sha384 | sha512
     -a, --attack         ATTACK_MODE  brute | mask | dictionary
-    -n, --num_workers    WORKERS      number of parallel workers
-    -w, --wordlist_path  PATH         path to wordlist for dictionary attack
+    -n, --num-workers    WORKERS      number of parallel workers
+    -w, --wordlist-path  PATH         path to wordlist for dictionary attack
     -m, --mask           MASK         mask for mask attack (see section below)
     -i, --increment      START:STOP   increment for mask
+    -c, --client         NODE_NAME    shortname for this client (defaults to client@hostname)
+    --worker-nodes       NODE_NAMES   comma separated list of worker shortnames
+    --cookie             COOKIE       node cookie
 
     Mask attack:
     A mask is useful to exploit certain patterns found in passwords,
