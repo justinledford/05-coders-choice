@@ -1,7 +1,4 @@
--combine mask/mask increment
 -show progress/# candidates tried
--server?
 -datastores?
--distributed nodes
 -opencl/cuda
 -markov chain generators
