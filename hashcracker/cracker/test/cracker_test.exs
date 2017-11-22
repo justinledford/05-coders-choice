@@ -2,11 +2,13 @@ defmodule CrackerTest do
   use ExUnit.Case
   doctest Cracker
 
+  # Tests can be run with distributed nodes
+  # by modifying worker_nodes below
   setup do
     {:ok, hostname} = :inet.gethostname
     client_node = :"client@#{hostname}"
     Node.start(client_node, :shortnames)
-    worker_nodes = [:"worker@#{hostname}"]
+    worker_nodes = [:"client@#{hostname}"]
     {:ok, client_node: client_node, worker_nodes: worker_nodes}
   end
 
