@@ -9,8 +9,8 @@ defmodule Cracker.Dispatcher do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def start(state=%{attack: mode}) do
-    GenServer.cast(__MODULE__, {mode, state})
+  def start(state) do
+    GenServer.cast(__MODULE__, {:start, state})
   end
 
   def not_found(pid, client_node) do
@@ -19,6 +19,10 @@ defmodule Cracker.Dispatcher do
 
   def found_pass(pass, client_node) do
     GenServer.cast {__MODULE__, client_node}, {:found_pass, pass}
+  end
+
+  def update_progress(attempts, client_node) do
+    GenServer.cast {__MODULE__, client_node}, {:update_attempts, attempts}
   end
 
   ##################################################
@@ -37,7 +41,14 @@ defmodule Cracker.Dispatcher do
     {:noreply, state}
   end
 
-  def handle_cast({_mode, state}, _) do
+  def handle_cast({:update_attempts, attempts}, state) do
+    state = Map.update(state, :attempts, attempts, &(&1 + attempts))
+    IO.inspect state.attempts
+    # TODO: send to client
+    {:noreply, state}
+  end
+
+  def handle_cast({:start, state}, _) do
     workers = DispatcherImpl.init_workers(state.num_workers)
     workers = Enum.zip(workers, 1..state.num_workers)
     state = Map.put(state, :workers, workers)

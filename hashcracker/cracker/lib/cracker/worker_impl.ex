@@ -1,4 +1,6 @@
 defmodule Cracker.WorkerImpl do
+  @update_increment 500
+
   def attack(state=%{attack: :mask, start: start, stop: stop}) do
     tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
     enums = [ state.chunk | tail_enums ]
@@ -14,6 +16,7 @@ defmodule Cracker.WorkerImpl do
     enums = [ state.chunk | tail_enums ]
     Cracker.Util.product(enums)
     |> Stream.map(&Enum.join/1)
+    |> update_progress(state.client_node, @update_increment)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
   end
@@ -22,6 +25,7 @@ defmodule Cracker.WorkerImpl do
     wordlist_stream(state.wordlist_path, state.start)
     |> Stream.map(&String.trim_trailing/1)
     |> stream_file_chunk(state.chunk_size)
+    |> update_progress(state.client_node, @update_increment)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
   end
@@ -33,6 +37,7 @@ defmodule Cracker.WorkerImpl do
     results = Cracker.Util.product(state.enums_partial, results)
     results
     |> Stream.map(&Enum.join/1)
+    |> update_progress(state.client_node, @update_increment)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> _mask_increment_loop(state, i, results)
   end
@@ -79,6 +84,19 @@ defmodule Cracker.WorkerImpl do
          {:halt, bytes_read}
        end
      end)
+  end
+
+  def update_progress(stream, client_node, increment) do
+    Stream.transform(stream, 0, fn candidate, attempts ->
+      attempts = attempts + 1
+      attempts = if attempts > increment do
+        Cracker.Dispatcher.update_progress(attempts, client_node)
+        0
+      else
+        attempts
+      end
+      { [candidate], attempts }
+    end)
   end
 
 end
