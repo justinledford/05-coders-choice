@@ -21,13 +21,7 @@ defmodule Cracker.WorkerImpl do
   def attack(state=%{attack: :dictionary}) do
     wordlist_stream(state.wordlist_path, state.start)
     |> Stream.map(&String.trim_trailing/1)
-    |> Stream.transform(0, fn line, bytes_read ->
-         if bytes_read < state.chunk_size do
-           {[line], bytes_read + (String.length line) + 1}
-         else
-           {:halt, bytes_read}
-         end
-       end)
+    |> stream_file_chunk(state.chunk_size)
     |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
   end
@@ -76,5 +70,15 @@ defmodule Cracker.WorkerImpl do
     IO.read(f, :line)
   end
 
+  # Stop stream once chunk_size has been read
+  defp stream_file_chunk(stream, chunk_size) do
+    Stream.transform(stream, 0, fn line, bytes_read ->
+       if bytes_read < chunk_size do
+         {[line], bytes_read + (String.length line) + 1}
+       else
+         {:halt, bytes_read}
+       end
+     end)
+  end
 
 end
