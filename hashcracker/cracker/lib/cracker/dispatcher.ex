@@ -21,7 +21,7 @@ defmodule Cracker.Dispatcher do
     GenServer.cast {__MODULE__, client_node}, {:found_pass, pass}
   end
 
-  def update_progress(attempts, client_node) do
+  def update_attempts(attempts, client_node) do
     GenServer.cast {__MODULE__, client_node}, {:update_attempts, attempts}
   end
 
@@ -43,8 +43,7 @@ defmodule Cracker.Dispatcher do
 
   def handle_cast({:update_attempts, attempts}, state) do
     state = Map.update(state, :attempts, attempts, &(&1 + attempts))
-    IO.inspect state.attempts
-    # TODO: send to client
+    send state.client_pid, {:update_attempts, state.attempts}
     {:noreply, state}
   end
 

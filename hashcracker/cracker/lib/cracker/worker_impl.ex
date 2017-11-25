@@ -1,5 +1,5 @@
 defmodule Cracker.WorkerImpl do
-  @update_increment 500
+  @update_increment 10_000
 
   def attack(state=%{attack: :mask, start: start, stop: stop}) do
     tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
@@ -16,8 +16,8 @@ defmodule Cracker.WorkerImpl do
     enums = [ state.chunk | tail_enums ]
     Cracker.Util.product(enums)
     |> Stream.map(&Enum.join/1)
-    |> update_progress(state.client_node, @update_increment)
-    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
+    |> update_attempts(state.client_node, @update_increment)
+    |> find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
   end
 
@@ -25,8 +25,8 @@ defmodule Cracker.WorkerImpl do
     wordlist_stream(state.wordlist_path, state.start)
     |> Stream.map(&String.trim_trailing/1)
     |> stream_file_chunk(state.chunk_size)
-    |> update_progress(state.client_node, @update_increment)
-    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
+    |> update_attempts(state.client_node, @update_increment)
+    |> find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
   end
 
@@ -37,8 +37,8 @@ defmodule Cracker.WorkerImpl do
     results = Cracker.Util.product(state.enums_partial, results)
     results
     |> Stream.map(&Enum.join/1)
-    |> update_progress(state.client_node, @update_increment)
-    |> Cracker.Cracker.find_matching_hash(state.hash, state.hash_type)
+    |> update_attempts(state.client_node, @update_increment)
+    |> find_matching_hash(state.hash, state.hash_type)
     |> _mask_increment_loop(state, i, results)
   end
 
@@ -86,17 +86,25 @@ defmodule Cracker.WorkerImpl do
      end)
   end
 
-  def update_progress(stream, client_node, increment) do
+  def update_attempts(stream, client_node, increment) do
     Stream.transform(stream, 0, fn candidate, attempts ->
       attempts = attempts + 1
-      attempts = if attempts > increment do
-        Cracker.Dispatcher.update_progress(attempts, client_node)
+      attempts = if attempts >= increment do
+        Cracker.Dispatcher.update_attempts(attempts, client_node)
         0
       else
         attempts
       end
       { [candidate], attempts }
     end)
+  end
+
+  defp find_matching_hash(stream, hash, hash_type) do
+    stream
+    |> Stream.map(fn x -> {x, :crypto.hash(hash_type, x) } end)
+    |> Stream.drop_while(fn { _, hash_ } -> hash_ != hash end)
+    |> Enum.take(1)
+    |> Enum.at(0)
   end
 
 end

@@ -1,9 +1,12 @@
 defmodule Cracker do
-  def crack(options) do
+  def crack(options, client \\ self()) do
     options
-    |> Map.put(:client_pid, self())
+    |> Map.put(:client_pid, client)
     |> Cracker.Dispatcher.start
-    wait_for_results()
+
+    if client == self() do
+      wait_for_results()
+    end
   end
 
   def wait_for_results do

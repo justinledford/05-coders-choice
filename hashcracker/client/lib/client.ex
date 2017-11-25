@@ -22,8 +22,9 @@ defmodule Client do
     |> set_defaults
     |> format_additional_options
     |> setup_node
-    |> Cracker.crack
-    |> print_result
+    |> Cracker.crack(self())
+
+    output()
   end
 
   def check_for_help(options) do
@@ -128,11 +129,32 @@ defmodule Client do
     options
   end
 
-  def print_result(nil) do
-    IO.puts "Password not found..."
+  def output(attempts_last \\ 0, time_last \\ :os.system_time(:seconds),
+             last_hash_rate \\ 0, num_updates \\ 0) do
+    receive do
+      {:pass_found, pass} ->
+        IO.puts "\nPassword found: #{pass}"
+      {:pass_not_found, nil} ->
+        IO.puts "\nPassword not found"
+      {:update_attempts, attempts} ->
+        time_now = :os.system_time
+        hash_rate = calc_hash_rate(time_last, time_now, attempts_last, attempts)
+        hash_rate = ((last_hash_rate*num_updates)+hash_rate)/(num_updates+1)
+        IO.ANSI.clear_line()
+        IO.write "\r"
+        IO.write "~#{attempts} attempts (~#{format_decimal(hash_rate)} hashes/sec)"
+        output(attempts, time_now, hash_rate, num_updates+1)
+    end
   end
-  def print_result(pass) do
-    IO.puts "Password found: #{pass}"
+
+  def calc_hash_rate(time_last, time_now, attempts_last, attempts_now) do
+    time_delta = (time_now - time_last) / 1_000_000
+    attempts_delta = attempts_now - attempts_last
+    attempts_delta / time_delta
+  end
+
+  def format_decimal(x, n \\ 3) do
+    :io_lib.format("~.#{n}f", [x]) |> IO.iodata_to_binary
   end
 
   def usage do
