@@ -10,9 +10,11 @@ defmodule Client do
                    cookie: :string]
   @options [aliases: @options_aliases, strict: @options_strict]
 
+  @name :crackercli
+
   def main(args) do
     {options, _, _} = OptionParser.parse(args, @options)
-    options
+    options = options
     |> Enum.into(%{})
     |> check_for_help
     |> validate_required_options
@@ -22,7 +24,8 @@ defmodule Client do
     |> set_defaults
     |> format_additional_options
     |> setup_node
-    |> Cracker.crack(self())
+
+    Cracker.crack(options, {@name, options.client_node})
 
     output()
   end
@@ -113,6 +116,7 @@ defmodule Client do
       Map.update!(options, :cookie, &String.to_atom/1)
       Node.set_cookie(options.cookie)
     end
+    Process.register(self(), @name)
     options
   end
 
