@@ -1,20 +1,28 @@
 defmodule Cracker.WorkerImpl do
   @update_increment 10_000
 
-  def attack(state=%{attack: :mask, start: start, stop: stop}) do
-    tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
-    enums = [ state.chunk | tail_enums ]
-    enums_partial = Enum.take(enums, start)
-    enums = Enum.drop(enums, start)
-    Map.merge(state, %{enums: enums, enums_partial: enums_partial})
-    |> mask_increment_loop(stop-start, [[]])
+  def attack(state=%{attack: :mask, incremental_start: start, incremental_stop: stop}) do
+    mask_enums = Cracker.Util.mask_to_enums(state.mask)
+    Enum.reduce(start..stop, fn i, result ->
+      case result do
+        {_pass, _} ->
+          message_dispatcher(result, state)
+        _ ->
+          mask_enums
+          |> Enum.take(i)
+          |> Cracker.Perm.perm(state.start)
+          |> Stream.map(&Enum.join/1)
+          |> update_attempts(state.client_node, @update_increment)
+          |> find_matching_hash(state.hash, state.hash_type)
+      end
+    end)
     |> message_dispatcher(state)
   end
 
   def attack(state=%{attack: :mask}) do
-    tail_enums = Cracker.Util.mask_to_enums(state.mask_t)
-    enums = [ state.chunk | tail_enums ]
-    Cracker.Util.product(enums)
+    state.mask
+    |> Cracker.Util.mask_to_enums
+    |> Cracker.Perm.perm(state.start)
     |> Stream.map(&Enum.join/1)
     |> update_attempts(state.client_node, @update_increment)
     |> find_matching_hash(state.hash, state.hash_type)
@@ -28,29 +36,6 @@ defmodule Cracker.WorkerImpl do
     |> update_attempts(state.client_node, @update_increment)
     |> find_matching_hash(state.hash, state.hash_type)
     |> message_dispatcher(state)
-  end
-
-  defp mask_increment_loop(_state,-1,_results) do
-    nil
-  end
-  defp mask_increment_loop(state, i, results) do
-    results = Cracker.Util.product(state.enums_partial, results)
-    results
-    |> Stream.map(&Enum.join/1)
-    |> update_attempts(state.client_node, @update_increment)
-    |> find_matching_hash(state.hash, state.hash_type)
-    |> _mask_increment_loop(state, i, results)
-  end
-
-  defp _mask_increment_loop(nil, state, i, results) do
-    enums_partial = Enum.take(state.enums, 1)
-    enums = Enum.drop(state.enums, 1)
-    state
-    |> Map.merge(%{enums: enums, enums_partial: enums_partial})
-    |> mask_increment_loop(i-1, results)
-  end
-  defp _mask_increment_loop(found, _, _, _) do
-    found
   end
 
   defp message_dispatcher(nil, state) do

@@ -46,4 +46,10 @@ defmodule Cracker.Util do
       end)
     end)
   end
+
+  def product_size(enums) do
+    Enum.reduce(enums, 1, fn enum, size ->
+      Enum.count(enum) * size
+    end)
+  end
 end

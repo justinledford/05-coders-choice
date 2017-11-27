@@ -45,7 +45,8 @@ defmodule DispatcherImpl do
   defp setup_worker_states(state=%{attack: :brute}) do
     mask = String.duplicate("?a", @brute_force_upper_bound)
     state
-    |> Map.merge(%{mask: mask, start: 1, stop: @brute_force_upper_bound})
+    |> Map.merge(%{mask: mask, incremental_start: 1,
+                   incremental_stop: @brute_force_upper_bound})
     |> Map.put(:attack, :mask)
     |> setup_worker_states
   end
@@ -60,13 +61,15 @@ defmodule DispatcherImpl do
   end
 
   defp setup_worker_states(state=%{attack: :mask}) do
-    {mask_h, mask_t} = split_mask_head_tail(state.mask)
-    [ h_enum | _ ] = Cracker.Util.mask_to_enums(mask_h)
-    chunks = Cracker.Util.chunk(h_enum, state.num_workers)
+    chunk_size = state.mask
+    |> Cracker.Util.mask_to_enums
+    |> Cracker.Util.product_size
+
+    starts = Enum.map(0..state.num_workers-1, &(&1*chunk_size))
 
     state
-    |> Map.merge(%{mask_t: mask_t})
-    |> merge_worker_states(chunks, :chunk)
+    |> Map.merge(%{chunk_size: chunk_size})
+    |> merge_worker_states(starts, :start)
   end
 
   defp merge_worker_states(state, xs, key) do
