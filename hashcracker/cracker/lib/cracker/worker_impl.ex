@@ -1,8 +1,19 @@
 defmodule Cracker.WorkerImpl do
   @update_increment 10_000
+  alias Cracker.Util, as: Util
+  alias Cracker.Perm, as: Perm
+  alias Cracker.Dispatcher, as: Dispatcher
 
-  def attack(state=%{attack: :mask, incremental_start: start, incremental_stop: stop}) do
-    mask_enums = Cracker.Util.mask_to_enums(state.mask)
+  def start_work(state) do
+    state = Map.put(state, :worker_pid, self())
+    pid = Node.spawn_link(state.worker_node, fn ->
+      attack(state)
+    end)
+    Map.put(state, :node_pid, pid)
+  end
+
+  defp attack(state=%{attack: :mask, incremental_start: start, incremental_stop: stop}) do
+    mask_enums = Util.mask_to_enums(state.mask)
     Enum.reduce(start..stop, fn i, result ->
       case result do
         {_pass, _} ->
@@ -10,27 +21,21 @@ defmodule Cracker.WorkerImpl do
         _ ->
           mask_enums
           |> Enum.take(i)
-          |> Cracker.Perm.perm(state.start)
-          |> Stream.map(&Enum.join/1)
-          |> update_attempts(state.client_node, @update_increment)
-          |> find_matching_hash(state.hash, state.hash_type)
+          |> perm_attack(state)
       end
     end)
     |> message_dispatcher(state)
   end
 
-  def attack(state=%{attack: :mask}) do
+  defp attack(state=%{attack: :mask}) do
     state.mask
-    |> Cracker.Util.mask_to_enums
-    |> Cracker.Perm.perm(state.start)
-    |> Stream.map(&Enum.join/1)
-    |> update_attempts(state.client_node, @update_increment)
-    |> find_matching_hash(state.hash, state.hash_type)
+    |> Util.mask_to_enums
+    |> perm_attack(state)
     |> message_dispatcher(state)
   end
 
-  def attack(state=%{attack: :dictionary}) do
-    wordlist_stream(state.wordlist_path, state.start)
+  defp attack(state=%{attack: :dictionary}) do
+    Util.wordlist_stream(state.wordlist_path, state.start)
     |> Stream.map(&String.trim_trailing/1)
     |> stream_file_chunk(state.chunk_size)
     |> update_attempts(state.client_node, @update_increment)
@@ -38,26 +43,20 @@ defmodule Cracker.WorkerImpl do
     |> message_dispatcher(state)
   end
 
+  defp perm_attack(enum, state) do
+    enum
+    |> Perm.perm(state.start)
+    |> Stream.map(&Enum.join/1)
+    |> update_attempts(state.client_node, @update_increment)
+    |> find_matching_hash(state.hash, state.hash_type)
+  end
+
   defp message_dispatcher(nil, state) do
-    Cracker.Dispatcher.not_found(state.worker_pid, state.client_node)
+    Dispatcher.not_found(state.worker_pid, state.client_node)
   end
 
   defp message_dispatcher({pass, _}, state) do
-    Cracker.Dispatcher.found_pass(pass, state.client_node)
-  end
-
-  defp wordlist_stream(wordlist_path, start) do
-    f = File.open!(wordlist_path, [:read_ahead])
-    {:ok, _} = :file.position(f, start)
-    seek_file(f, start)
-    IO.stream(f, :line)
-  end
-
-  defp seek_file(_, 0) do
-    nil
-  end
-  defp seek_file(f, _) do
-    IO.read(f, :line)
+    Dispatcher.found_pass(pass, state.client_node)
   end
 
   # Stop stream once chunk_size has been read
@@ -71,11 +70,11 @@ defmodule Cracker.WorkerImpl do
      end)
   end
 
-  def update_attempts(stream, client_node, increment) do
+  defp update_attempts(stream, client_node, increment) do
     Stream.transform(stream, 0, fn candidate, attempts ->
       attempts = attempts + 1
       attempts = if attempts >= increment do
-        Cracker.Dispatcher.update_attempts(attempts, client_node)
+        Dispatcher.update_attempts(attempts, client_node)
         0
       else
         attempts

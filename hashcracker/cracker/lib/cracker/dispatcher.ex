@@ -1,6 +1,8 @@
 defmodule Cracker.Dispatcher do
   use GenServer
 
+  alias Cracker.DispatcherImpl, as: Impl
+
   ##################################################
   # External API
   ##################################################
@@ -13,6 +15,10 @@ defmodule Cracker.Dispatcher do
     GenServer.cast(__MODULE__, {:start, state})
   end
 
+  def update_attempts(attempts, client_node) do
+    GenServer.cast {__MODULE__, client_node}, {:update_attempts, attempts}
+  end
+
   def not_found(pid, client_node) do
     GenServer.cast {__MODULE__, client_node},  {:not_found, pid}
   end
@@ -21,39 +27,27 @@ defmodule Cracker.Dispatcher do
     GenServer.cast {__MODULE__, client_node}, {:found_pass, pass}
   end
 
-  def update_attempts(attempts, client_node) do
-    GenServer.cast {__MODULE__, client_node}, {:update_attempts, attempts}
-  end
-
   ##################################################
   # GenServer implementation
   ##################################################
 
-  def handle_cast({:not_found, worker_pid}, state) do
-    worker_count = Enum.count(state.workers)
-    state = DispatcherImpl.worker_done(worker_pid, state, worker_count)
-    {:noreply, state}
-  end
-
-  def handle_cast({:found_pass, pass}, state) do
-    if Process.whereis(Cracker.DispatcherSupervisor) do
-      Supervisor.stop(Cracker.DispatcherSupervisor)
-    end
-    send state.client_pid, {:pass_found, pass}
+  def handle_cast({:start, state}, _) do
+    state = Impl.start(state)
     {:noreply, state}
   end
 
   def handle_cast({:update_attempts, attempts}, state) do
-    state = Map.update(state, :attempts, attempts, &(&1 + attempts))
-    send state.client_pid, {:update_attempts, state.attempts}
+    state = Impl.update_attempts(attempts, state)
     {:noreply, state}
   end
 
-  def handle_cast({:start, state}, _) do
-    workers = DispatcherImpl.init_workers(state.num_workers)
-    workers = Enum.zip(workers, 1..state.num_workers)
-    state = Map.put(state, :workers, workers)
-    DispatcherImpl.dispatch(state)
+  def handle_cast({:not_found, worker_pid}, state) do
+    state = Impl.not_found(worker_pid, state)
+    {:noreply, state}
+  end
+
+  def handle_cast({:found_pass, pass}, state) do
+    Impl.found_pass(pass, state)
     {:noreply, state}
   end
 

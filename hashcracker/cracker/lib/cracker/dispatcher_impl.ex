@@ -1,47 +1,67 @@
-defmodule DispatcherImpl do
+defmodule Cracker.DispatcherImpl do
+  alias Cracker.DispatcherSupervisor, as: DispatcherSupervisor
+  alias Cracker.Util, as: Util
+  alias Cracker.Worker, as: Worker
 
   @brute_force_upper_bound 64
 
-  def init_workers(num_workers) do
-    {:ok, _} = Cracker.DispatcherSupervisor.start_link(num_workers)
-    Supervisor.which_children(Cracker.DispatcherSupervisor)
+  def start(state) do
+    workers = init_workers(state.num_workers)
+    workers = Enum.zip(workers, 1..state.num_workers)
+    state = Map.put(state, :workers, workers)
+    dispatch(state)
+    state
+  end
+
+  def update_attempts(attempts, state) do
+    state = Map.update(state, :attempts, attempts, &(&1 + attempts))
+    send state.client_pid, {:update_attempts, state.attempts}
+    state
+  end
+
+  def not_found(worker_pid, state) do
+    worker_count = Enum.count(state.workers)
+    state = worker_done(worker_pid, state, worker_count)
+    state
+  end
+
+  def found_pass(pass, state) do
+    if Process.whereis(DispatcherSupervisor) do
+      Supervisor.stop(DispatcherSupervisor)
+    end
+    send state.client_pid, {:pass_found, pass}
+  end
+
+  defp init_workers(num_workers) do
+    {:ok, _} = DispatcherSupervisor.start_link(num_workers)
+    Supervisor.which_children(DispatcherSupervisor)
     |> Enum.map(fn {_, pid, _, _} -> pid end)
   end
 
-  def get_worker(state) do
+  defp get_worker(state) do
     i = rem(state.worker_num, Enum.count(state.worker_nodes))
     Enum.at(state.worker_nodes, i)
   end
 
-  def dispatch(state) do
+  defp dispatch(state) do
     state
     |> setup_worker_states
     |> assign_worker_nodes
     |> start_workers
   end
 
-  def worker_done(_worker, state, worker_count) when worker_count < 2 do
-    if Process.whereis(Cracker.DispatcherSupervisor) do
-      Supervisor.stop(Cracker.DispatcherSupervisor)
+  defp worker_done(_worker, state, worker_count) when worker_count < 2 do
+    if Process.whereis(DispatcherSupervisor) do
+      Supervisor.stop(DispatcherSupervisor)
     end
     send state.client_pid, {:pass_not_found, nil}
     state
   end
-  def worker_done(worker_pid, state, _) do
+  defp worker_done(worker_pid, state, _) do
     workers = Enum.filter(state.workers, fn {pid, _} ->
       worker_pid != pid
     end)
     Map.put(state, :workers, workers)
-  end
-
-
-  defp split_mask_head_tail(mask) do
-    case String.split(mask, "?", trim: true, parts: 2) do
-      [ h | [ mask ] ] ->
-        {h, mask}
-      [ h | [] ] ->
-        {h, ""}
-    end
   end
 
   defp setup_worker_states(state=%{attack: :brute}) do
@@ -53,20 +73,8 @@ defmodule DispatcherImpl do
     |> setup_worker_states
   end
 
-  defp setup_worker_states(state=%{attack: :dictionary}) do
-    chunk_size = file_chunk_size(state.wordlist_path, state.num_workers)
-    starts = Enum.map(0..state.num_workers-1, &(&1*chunk_size))
-
-    state
-    |> Map.merge(%{chunk_size: chunk_size})
-    |> merge_worker_states(starts, :start)
-  end
-
-  defp setup_worker_states(state=%{attack: :mask}) do
-    chunk_size = state.mask
-    |> Cracker.Util.mask_to_enums
-    |> Cracker.Util.product_size
-
+  defp setup_worker_states(state) do
+    chunk_size = get_chunk_size(state)
     starts = Enum.map(0..state.num_workers-1, &(&1*chunk_size))
 
     state
@@ -95,14 +103,20 @@ defmodule DispatcherImpl do
   end
 
   defp start_workers(worker_states) do
-    Enum.map(worker_states, &Cracker.Worker.start_work/1)
+    Enum.map(worker_states, &Worker.start_work/1)
   end
 
-  defp file_chunk_size(file_path, num_chunks) do
-    file_path
+  defp get_chunk_size(state=%{attack: :dictionary}) do
+    state.wordlist_path
     |> File.stat!
     |> Map.get(:size)
-    |> div(num_chunks)
+    |> div(state.num_workers)
+  end
+
+  defp get_chunk_size(state=%{attack: :mask}) do
+    state.mask
+    |> Util.mask_to_enums
+    |> Util.product_size
   end
 
 end

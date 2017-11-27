@@ -1,6 +1,8 @@
 defmodule Cracker.Worker do
   use GenServer
 
+  alias Cracker.WorkerImpl, as: Impl
+
   ##################################################
   # External API
   ##################################################
@@ -18,11 +20,8 @@ defmodule Cracker.Worker do
   ##################################################
 
   def handle_cast({:start_work, state}, _) do
-    state = Map.put(state, :worker_pid, self())
-    pid = Node.spawn_link(state.worker_node, fn ->
-      Cracker.WorkerImpl.attack(state)
-    end)
-    {:noreply, Map.put(state, :node_pid, pid)}
+    state = Impl.start_work(state)
+    {:noreply, state}
   end
 
 end

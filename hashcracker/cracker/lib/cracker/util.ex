@@ -1,11 +1,14 @@
 defmodule Cracker.Util do
+
+  alias Cracker.Charsets, as: Charsets
+
   def mask_to_enums(mask) do
     charsets = %{
-      "l" => Cracker.Charsets.l,
-      "u" => Cracker.Charsets.u,
-      "d" => Cracker.Charsets.d,
-      "s" => Cracker.Charsets.s,
-      "a" => Cracker.Charsets.a
+      "l" => Charsets.l,
+      "u" => Charsets.u,
+      "d" => Charsets.d,
+      "s" => Charsets.s,
+      "a" => Charsets.a
     }
 
     mask
@@ -52,4 +55,19 @@ defmodule Cracker.Util do
       Enum.count(enum) * size
     end)
   end
+
+  def wordlist_stream(wordlist_path, start) do
+    f = File.open!(wordlist_path, [:read_ahead])
+    {:ok, _} = :file.position(f, start)
+    seek_file(f, start)
+    IO.stream(f, :line)
+  end
+
+  def seek_file(_, 0) do
+    nil
+  end
+  def seek_file(f, _) do
+    IO.read(f, :line)
+  end
+
 end
