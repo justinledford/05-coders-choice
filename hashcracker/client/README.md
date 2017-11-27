@@ -12,6 +12,14 @@ CLI client for hashcracker
 ./hashcracker --help
 ```
 
+### Distributed nodes
+To start worker nodes
+```
+cd ../cracker
+epmd -daemon
+iex --sname <name> -S mix
+```
+
 ## Options
 ```
 -h, --hash           HASH         base16 encoded hash (lower or upper case)
