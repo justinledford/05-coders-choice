@@ -21,7 +21,9 @@ defmodule DispatcherImpl do
   end
 
   def worker_done(_worker, state, worker_count) when worker_count < 2 do
-    Supervisor.stop(Cracker.DispatcherSupervisor)
+    if Process.whereis(Cracker.DispatcherSupervisor) do
+      Supervisor.stop(Cracker.DispatcherSupervisor)
+    end
     send state.client_pid, {:pass_not_found, nil}
     state
   end

@@ -36,7 +36,9 @@ defmodule Cracker.Dispatcher do
   end
 
   def handle_cast({:found_pass, pass}, state) do
-    Supervisor.stop(Cracker.DispatcherSupervisor)
+    if Process.whereis(Cracker.DispatcherSupervisor) do
+      Supervisor.stop(Cracker.DispatcherSupervisor)
+    end
     send state.client_pid, {:pass_found, pass}
     {:noreply, state}
   end
