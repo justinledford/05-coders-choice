@@ -113,7 +113,7 @@ defmodule Client do
   def setup_node(options) do
     {:ok, _} = Node.start(options.client_node, :shortnames)
     if Map.has_key?(options, :cookie) do
-      Map.update!(options, :cookie, &String.to_atom/1)
+      options = Map.update!(options, :cookie, &String.to_atom/1)
       Node.set_cookie(options.cookie)
     end
     Process.register(self(), @name)
